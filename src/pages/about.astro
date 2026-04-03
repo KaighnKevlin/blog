@@ -1,0 +1,30 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE_TITLE } from '../consts';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`About — ${SITE_TITLE}`} description="About me and what I do." />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<h1>About</h1>
+			<p>
+				I'm Kaighn — I build things with code, AI, and game engines. This site is where I write about
+				what I'm learning and share projects I'm working on.
+			</p>
+			<p>
+				Current interests: AI agents, interactive simulations, and indie game development with Godot.
+			</p>
+			<p>
+				If you want to get in touch, find me on GitHub.
+			</p>
+		</main>
+		<Footer />
+	</body>
+</html>

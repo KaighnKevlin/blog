@@ -1,0 +1,37 @@
+---
+// A simple interactive Astro Island: slider that calculates sphere volume.
+---
+
+<div class="sphere-calc rounded-xl border border-gray-200 p-6 my-8 bg-white">
+  <h3 class="text-lg font-semibold mb-4">Sphere Volume Calculator</h3>
+  <label class="block mb-2">
+    Radius: <strong id="radius-val">5</strong>
+  </label>
+  <input
+    id="radius-slider"
+    type="range"
+    min="1"
+    max="50"
+    value="5"
+    class="w-full mb-4 accent-[var(--accent)]"
+  />
+  <p class="text-2xl font-mono" id="volume-result">
+    Volume = 523.60 units&sup3;
+  </p>
+</div>
+
+<script>
+  const slider = document.getElementById('radius-slider') as HTMLInputElement;
+  const radiusVal = document.getElementById('radius-val')!;
+  const volumeResult = document.getElementById('volume-result')!;
+
+  function update() {
+    const r = Number(slider.value);
+    radiusVal.textContent = String(r);
+    const vol = (4 / 3) * Math.PI * r ** 3;
+    volumeResult.textContent = `Volume = ${vol.toFixed(2)} units\u00B3`;
+  }
+
+  slider.addEventListener('input', update);
+  update();
+</script>

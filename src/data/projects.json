@@ -1,0 +1,20 @@
+[
+  {
+    "title": "Kaighnbot",
+    "description": "An AI agent that automates tasks and integrates with external services. Built to explore the boundaries of autonomous AI tooling.",
+    "url": "#",
+    "tags": ["AI", "Agents", "Automation"]
+  },
+  {
+    "title": "Housing Simulator",
+    "description": "An interactive simulation modeling housing markets, zoning policies, and their downstream effects. Built for exploration and education.",
+    "url": "#",
+    "tags": ["Simulation", "Interactive", "Data Viz"]
+  },
+  {
+    "title": "Untitled Godot Game",
+    "description": "An indie game blending Terraria's exploration, Factorio's automation, and tower defense strategy. Work in progress in Godot 4.",
+    "url": "#",
+    "tags": ["Godot", "Game Dev", "Indie"]
+  }
+]

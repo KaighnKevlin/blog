@@ -1,0 +1,37 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE_TITLE } from '../consts';
+import projects from '../data/projects.json';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`Projects — ${SITE_TITLE}`} description="A showcase of my projects." />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<section>
+				<h1 class="text-4xl font-bold mb-2">Projects</h1>
+				<p class="text-gray-500 mb-8">Things I've built or am building.</p>
+				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+					{projects.map((project) => (
+						<a href={project.url} class="block rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow no-underline">
+							<h2 class="text-xl font-semibold mb-2 text-[rgb(var(--black))]">{project.title}</h2>
+							<p class="text-gray-600 mb-4">{project.description}</p>
+							<div class="flex flex-wrap gap-2">
+								{project.tags.map((tag) => (
+									<span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">{tag}</span>
+								))}
+							</div>
+						</a>
+					))}
+				</div>
+			</section>
+		</main>
+		<Footer />
+	</body>
+</html>

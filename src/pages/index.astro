@@ -1,0 +1,179 @@
+---
+import { Image } from 'astro:assets';
+import { getCollection } from 'astro:content';
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import FormattedDate from '../components/FormattedDate.astro';
+import Header from '../components/Header.astro';
+import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+import projects from '../data/projects.json';
+
+const posts = (await getCollection('blog'))
+	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+	.slice(0, 3);
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<section class="hero">
+				<h1>Hey, I'm Kaighn.</h1>
+				<p>I build things with code, AI, and game engines. This is where I write about it.</p>
+			</section>
+
+			<section>
+				<div class="section-header">
+					<h2>Recent Posts</h2>
+					<a href="/blog">View all &rarr;</a>
+				</div>
+				<ul class="post-list">
+					{posts.map((post) => (
+						<li>
+							<a href={`/blog/${post.id}/`}>
+								{post.data.heroImage && (
+									<Image width={720} height={360} src={post.data.heroImage} alt="" />
+								)}
+								<h4 class="title">{post.data.title}</h4>
+								<p class="date">
+									<FormattedDate date={post.data.pubDate} />
+								</p>
+							</a>
+						</li>
+					))}
+				</ul>
+			</section>
+
+			<section>
+				<div class="section-header">
+					<h2>Projects</h2>
+					<a href="/projects">View all &rarr;</a>
+				</div>
+				<div class="project-grid">
+					{projects.map((project) => (
+						<a href={project.url} class="project-card">
+							<h4>{project.title}</h4>
+							<p>{project.description}</p>
+							<div class="tags">
+								{project.tags.map((tag) => (
+									<span class="tag">{tag}</span>
+								))}
+							</div>
+						</a>
+					))}
+				</div>
+			</section>
+		</main>
+		<Footer />
+	</body>
+</html>
+
+<style>
+	.hero {
+		padding: 2em 0 1em;
+	}
+	.hero h1 {
+		font-size: 2.5em;
+		margin-bottom: 0.25em;
+	}
+	.hero p {
+		font-size: 1.2em;
+		color: rgb(var(--gray));
+	}
+	.section-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		margin-bottom: 1em;
+	}
+	.section-header h2 {
+		margin: 0;
+	}
+	.section-header a {
+		font-size: 0.9em;
+	}
+	.post-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.5rem;
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		margin-bottom: 3em;
+	}
+	.post-list li {
+		width: calc(33.333% - 1rem);
+	}
+	.post-list li a {
+		display: block;
+		text-decoration: none;
+	}
+	.post-list li img {
+		margin-bottom: 0.5rem;
+		border-radius: 12px;
+	}
+	.title {
+		margin: 0;
+		color: rgb(var(--black));
+		line-height: 1.2;
+	}
+	.date {
+		margin: 0.25em 0 0;
+		color: rgb(var(--gray));
+		font-size: 0.875em;
+	}
+	.post-list li a:hover .title {
+		color: var(--accent);
+	}
+	.project-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 1.5rem;
+		margin-bottom: 2em;
+	}
+	.project-card {
+		display: block;
+		padding: 1.5em;
+		border: 1px solid rgb(var(--gray-light));
+		border-radius: 12px;
+		text-decoration: none;
+		transition: box-shadow 0.2s ease;
+	}
+	.project-card:hover {
+		box-shadow: var(--box-shadow);
+	}
+	.project-card h4 {
+		margin: 0 0 0.5em;
+		color: rgb(var(--black));
+	}
+	.project-card p {
+		margin: 0 0 0.75em;
+		color: rgb(var(--gray));
+		font-size: 0.9em;
+	}
+	.tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5em;
+	}
+	.tag {
+		font-size: 0.75em;
+		font-weight: 600;
+		padding: 0.2em 0.6em;
+		border-radius: 999px;
+		background: rgba(var(--gray-light), 0.7);
+		color: rgb(var(--gray-dark));
+	}
+	@media (max-width: 720px) {
+		.post-list li {
+			width: 100%;
+		}
+		.project-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

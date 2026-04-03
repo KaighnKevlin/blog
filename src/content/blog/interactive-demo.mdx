@@ -1,0 +1,17 @@
+---
+title: "Interactive MDX Demo"
+description: "A sample post demonstrating interactive components embedded in MDX."
+pubDate: "Apr 03 2026"
+---
+
+import SphereCalculator from '../../components/SphereCalculator.astro';
+
+This blog supports **interactive components** right inside posts. Below is a live sphere volume calculator — drag the slider to see the result update in real time.
+
+<SphereCalculator />
+
+## How it works
+
+The component above is an [Astro Island](https://docs.astro.build/en/concepts/islands/) — a self-contained interactive widget embedded directly into this MDX file. The JavaScript runs entirely client-side while the rest of the page remains static HTML.
+
+This means we can mix rich prose with interactive math visualizers, simulations, or any other JS-powered tool — all in a single blog post.
