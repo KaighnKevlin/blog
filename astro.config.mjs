@@ -8,7 +8,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://kaighnbot.com',
+  site: 'https://kaighn.com',
   integrations: [mdx(), sitemap()],
 
   vite: {
