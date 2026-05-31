@@ -1,0 +1,85 @@
+---
+// Stone-Geary subsistence cliff visualization.
+// Shows how utility is a step function near the subsistence floor, not smooth.
+---
+
+<div class="sg-widget rounded-xl border border-gray-200 p-6 my-8 bg-white">
+  <h3 class="text-lg font-semibold mb-1">The subsistence cliff</h3>
+  <p class="text-sm text-gray-600 mb-4">Drag the sliders. Watch utility crash when rent leaves less than $800 for food, transit, and necessities — not gradually, but all at once.</p>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+    <label class="block">
+      <span class="text-sm">Monthly income: <strong id="sg-income-val" class="font-mono">$3,500</strong></span>
+      <input id="sg-income" type="range" min="1500" max="15000" step="100" value="3500" class="w-full accent-[var(--accent)]" />
+    </label>
+    <label class="block">
+      <span class="text-sm">Monthly rent: <strong id="sg-rent-val" class="font-mono">$2,000</strong></span>
+      <input id="sg-rent" type="range" min="400" max="6000" step="50" value="2000" class="w-full accent-[var(--accent)]" />
+    </label>
+  </div>
+
+  <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm">
+    <div class="flex justify-between mb-1"><span>Income left after rent:</span><span id="sg-composite">$1,500</span></div>
+    <div class="flex justify-between mb-1"><span>Subsistence needed:</span><span class="text-gray-500">$800</span></div>
+    <div class="flex justify-between mb-3"><span>Discretionary:</span><span id="sg-discretionary">$700</span></div>
+    <div class="relative h-6 bg-gray-200 rounded overflow-hidden">
+      <div id="sg-utility-bar" class="h-full bg-green-500 transition-all" style="width: 50%"></div>
+    </div>
+    <p id="sg-verdict" class="mt-3 text-center font-sans font-semibold text-green-700">Affordable</p>
+  </div>
+
+  <details class="mt-3 text-xs text-gray-600">
+    <summary class="cursor-pointer">Why is this a cliff and not a slope?</summary>
+    <p class="mt-2">Classical economics assumes goods are substitutable — if rent goes up, you can just consume less food. Stone-Geary utility says no: you need <em>at least</em> subsistence consumption (≈$800/mo for transit + groceries + utilities), and the slider here treats that as binding. Below the cliff, the unit isn't merely "less attractive" — it's <em>infeasible</em>. This is why high-income areas have stable demand while low-income areas see catastrophic flight when rents tick up.</p>
+  </details>
+</div>
+
+<script>
+  const income = document.getElementById('sg-income') as HTMLInputElement;
+  const rent = document.getElementById('sg-rent') as HTMLInputElement;
+  const incomeVal = document.getElementById('sg-income-val')!;
+  const rentVal = document.getElementById('sg-rent-val')!;
+  const composite = document.getElementById('sg-composite')!;
+  const disc = document.getElementById('sg-discretionary')!;
+  const bar = document.getElementById('sg-utility-bar')!;
+  const verdict = document.getElementById('sg-verdict')!;
+
+  const SUBSISTENCE = 800;
+
+  function update() {
+    const i = Number(income.value);
+    const r = Number(rent.value);
+    const c = i - r;
+    const d = c - SUBSISTENCE;
+
+    incomeVal.textContent = `$${i.toLocaleString()}`;
+    rentVal.textContent = `$${r.toLocaleString()}`;
+    composite.textContent = `$${c.toLocaleString()}`;
+    disc.textContent = d > 0 ? `$${d.toLocaleString()}` : '($' + Math.abs(d).toLocaleString() + ' short)';
+
+    if (d <= 0) {
+      bar.style.width = '5%';
+      bar.className = 'h-full bg-red-500 transition-all';
+      verdict.textContent = "Can't afford — utility = 0";
+      verdict.className = 'mt-3 text-center font-sans font-semibold text-red-700';
+    } else if (d < 500) {
+      bar.style.width = '25%';
+      bar.className = 'h-full bg-amber-500 transition-all';
+      verdict.textContent = 'Severe rent burden';
+      verdict.className = 'mt-3 text-center font-sans font-semibold text-amber-700';
+    } else if (d < 1500) {
+      bar.style.width = '60%';
+      bar.className = 'h-full bg-yellow-500 transition-all';
+      verdict.textContent = 'Cost-burdened';
+      verdict.className = 'mt-3 text-center font-sans font-semibold text-yellow-700';
+    } else {
+      bar.style.width = Math.min(95, 60 + d / 100) + '%';
+      bar.className = 'h-full bg-green-500 transition-all';
+      verdict.textContent = 'Affordable';
+      verdict.className = 'mt-3 text-center font-sans font-semibold text-green-700';
+    }
+  }
+  income.addEventListener('input', update);
+  rent.addEventListener('input', update);
+  update();
+</script>

@@ -1,0 +1,342 @@
+---
+// 180-year NYC housing history timeline, ported from the simulator's
+// in-game Glossary > History tab. Pure static markup — no JS needed.
+// Kept in dark slate palette to evoke the sim's UI.
+---
+
+<div class="nyc-timeline bg-slate-900 text-slate-300 rounded-xl p-6 my-8 border border-slate-700 text-[13px] leading-relaxed">
+  <div class="flex items-baseline justify-between mb-3">
+    <h3 class="text-base font-semibold text-white">180 years of NYC housing policy</h3>
+    <span class="text-[10px] text-slate-500 uppercase tracking-wider font-mono">From the simulator</span>
+  </div>
+  <p class="text-slate-400 mb-3 text-[12px]">Every reform created the conditions for the next crisis. Tenement overcrowding → zoning → Moses → ULURP → NIMBYs → housing shortage → COYHO.</p>
+
+  <div class="text-[10px] text-slate-500 mb-2 italic">Scroll through 180 years ↓</div>
+
+  <div class="nyc-timeline-scroll max-h-[480px] overflow-y-auto pr-3 -mr-3 space-y-3 relative">
+
+  <!-- Era: The Tenement Era -->
+  <div class="mb-3">
+    <div class="flex items-center gap-2 mb-2">
+      <div class="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0"></div>
+      <h4 class="text-[13px] font-bold text-white">The Tenement Era</h4>
+      <span class="text-[10px] text-slate-500">1840s–1900s</span>
+    </div>
+    <div class="ml-1.5 border-l-2 border-slate-700 pl-4 space-y-2">
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1840s</div>
+        <div class="text-[11px] text-slate-300">First purpose-built tenements appear on the Lower East Side as Irish and German immigration surges. By 1900, the LES has the highest population density in the world — over 330,000 people per square mile. Families of 10 share 325-square-foot apartments with no running water, ventilation, or indoor plumbing.</div>
+        <div class="flex flex-wrap gap-2 mt-1">
+          <a href="https://en.wikipedia.org/wiki/Tenement" target="_blank" rel="noopener noreferrer" class="text-[9px] text-cyan-400 hover:text-cyan-300 underline decoration-cyan-600/40">Tenement — Wikipedia ↗</a>
+        </div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1867</div>
+        <div class="text-[11px] text-slate-300"><strong>Tenement House Act of 1867</strong> — New York's first housing law. Requires one privy per 20 residents and a fire escape per building. Largely unenforced.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1879</div>
+        <div class="text-[11px] text-slate-300">"Dumbbell tenement" design wins a city competition — narrow air shafts between buildings create the illusion of ventilation while maximizing lot coverage. 80,000 are built over the next 20 years.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1890</div>
+        <div class="text-[11px] text-slate-300">Jacob Riis publishes <em>How the Other Half Lives</em>, photojournalism exposing tenement conditions. Sparks reform movement.</div>
+        <div class="flex flex-wrap gap-2 mt-1">
+          <a href="https://en.wikipedia.org/wiki/How_the_Other_Half_Lives" target="_blank" rel="noopener noreferrer" class="text-[9px] text-cyan-400 hover:text-cyan-300 underline decoration-cyan-600/40">How the Other Half Lives ↗</a>
+        </div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1901</div>
+        <div class="text-[11px] text-slate-300"><strong>Tenement House Act of 1901 ("New Law")</strong> — Spearheaded by reformer Lawrence Veiller. Requires every room to have a window opening outside, indoor plumbing, fire-resistant construction, minimum room sizes. Bans dumbbell tenements. Over 200,000 apartments built under the new standards.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Era: The Birth of Zoning -->
+  <div class="mb-3">
+    <div class="flex items-center gap-2 mb-2">
+      <div class="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0"></div>
+      <h4 class="text-[13px] font-bold text-white">The Birth of Zoning</h4>
+      <span class="text-[10px] text-slate-500">1916–1961</span>
+    </div>
+    <div class="ml-1.5 border-l-2 border-slate-700 pl-4 space-y-2">
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1915</div>
+        <div class="text-[11px] text-slate-300">The 40-story <strong>Equitable Building</strong> rises 1.2 million sq ft straight up from the lot line with no setbacks. Casts a permanent 7-acre shadow. The immediate catalyst for zoning reform.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1916</div>
+        <div class="text-[11px] text-slate-300"><strong>1916 Zoning Resolution</strong> — First comprehensive zoning law in the United States. Three use districts (residential, commercial, unrestricted) and setback regulations producing the "wedding cake" skyscraper shape. By 1926, 76 US cities adopt similar codes.</div>
+        <div class="flex flex-wrap gap-2 mt-1">
+          <a href="https://en.wikipedia.org/wiki/1916_Zoning_Resolution" target="_blank" rel="noopener noreferrer" class="text-[9px] text-cyan-400 hover:text-cyan-300 underline decoration-cyan-600/40">1916 Zoning Resolution ↗</a>
+        </div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1934</div>
+        <div class="text-[11px] text-slate-300"><strong>NYCHA created</strong> — First public housing authority in the US. Will eventually house 400,000+ New Yorkers in 335 developments.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1942</div>
+        <div class="text-[11px] text-slate-300"><strong>Federal rent control enacted</strong> — WWII Emergency Price Control Act freezes rents nationwide. NYC rents frozen at March 1, 1943 levels. After the war ends, most cities decontrol — NYC keeps it, creating the foundation of the modern rent regulation system.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1949</div>
+        <div class="text-[11px] text-slate-300"><strong>Housing Act of 1949 (Title I)</strong> — Federal "urban renewal" program. Robert Moses uses Title I to demolish neighborhoods and replace them with superblocks. Over 15 years, Moses displaces 250,000+ people, disproportionately Black and Puerto Rican.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1955</div>
+        <div class="text-[11px] text-slate-300"><strong>Jane Jacobs vs. Robert Moses begins.</strong> Moses proposes extending Fifth Avenue through Washington Square Park. Jacobs and community activists fight back. The road is blocked in 1959 — first major defeat for Moses's highway agenda.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1956</div>
+        <div class="text-[11px] text-slate-300"><strong>Cross-Bronx Expressway construction begins.</strong> Moses routes a highway through the South Bronx, destroying 60,000 homes. Triggers the spiral of poverty, abandonment, and fire that devastates the Bronx in the 1970s.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1961</div>
+        <div class="text-[11px] text-slate-300"><strong>1961 Zoning Resolution</strong> — Replaces the 1916 code with the FAR system still used today (and modeled in this simulator). Sets maximum FARs by district: R1 (0.5) to R10 (12.0).</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1961</div>
+        <div class="text-[11px] text-slate-300"><strong>Jane Jacobs publishes <em>The Death and Life of Great American Cities</em></strong> — Argues that the top-down urban renewal approach destroys what makes cities work. Champions mixed uses, short blocks, old buildings, and high density. Becomes the most influential book in urban planning history.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Era: Crisis & Rent Stabilization -->
+  <div class="mb-3">
+    <div class="flex items-center gap-2 mb-2">
+      <div class="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"></div>
+      <h4 class="text-[13px] font-bold text-white">Crisis & Rent Stabilization</h4>
+      <span class="text-[10px] text-slate-500">1963–1979</span>
+    </div>
+    <div class="ml-1.5 border-l-2 border-slate-700 pl-4 space-y-2">
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1963</div>
+        <div class="text-[11px] text-slate-300"><strong>Penn Station demolished.</strong> McKim, Mead & White's 1910 masterpiece razed for Madison Square Garden. Ada Louise Huxtable: "One entered the city like a god. One scuttles in now like a rat." The outrage directly leads to the Landmarks Law.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1965</div>
+        <div class="text-[11px] text-slate-300"><strong>Landmarks Preservation Commission created</strong> — Directly motivated by Penn Station's demolition. Will eventually protect ~37,600 properties — but critics argue it freezes housing supply in the neighborhoods that need density most.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1969</div>
+        <div class="text-[11px] text-slate-300"><strong>Rent Stabilization Law of 1969</strong> — Creates the modern two-tier rent regulation system. Rent control (pre-1947 buildings) and rent stabilization (buildings with 6+ units built 1947-1974). Approximately 1 million apartments are stabilized.</div>
+        <div class="flex flex-wrap gap-2 mt-1">
+          <a href="https://en.wikipedia.org/wiki/Rent_regulation_in_New_York" target="_blank" rel="noopener noreferrer" class="text-[9px] text-cyan-400 hover:text-cyan-300 underline decoration-cyan-600/40">Rent Stabilization Law ↗</a>
+        </div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1971</div>
+        <div class="text-[11px] text-slate-300"><strong>421-a tax abatement created</strong> — Exempts new residential construction from property tax increases for 10-25 years. Becomes the primary incentive for new rental housing — produces over 180,000 apartments by 2022.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1975</div>
+        <div class="text-[11px] text-slate-300"><strong>NYC fiscal crisis.</strong> City nearly declares bankruptcy. Daily News headline: "FORD TO CITY: DROP DEAD". Massive cuts to housing services. NYCHA maintenance budgets slashed — beginning of the $40B+ capital backlog that persists today.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1975</div>
+        <div class="text-[11px] text-slate-300"><strong>ULURP established</strong> — NYC Charter revision creates mandatory public review for zoning changes. Community Boards, Borough Presidents, City Planning Commission, and City Council all get a voice. Designed to prevent another Robert Moses — but eventually empowers NIMBYs to block housing.</div>
+        <div class="flex flex-wrap gap-2 mt-1">
+          <a href="https://en.wikipedia.org/wiki/Uniform_Land_Use_Review_Procedure" target="_blank" rel="noopener noreferrer" class="text-[9px] text-cyan-400 hover:text-cyan-300 underline decoration-cyan-600/40">ULURP — Wikipedia ↗</a>
+        </div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1970s</div>
+        <div class="text-[11px] text-slate-300"><strong>South Bronx burning.</strong> At peak, 120,000 fires per year. The South Bronx loses 36% of its housing stock and 40% of its population. 250,000 people displaced. Causes: arson-for-insurance, redlining, the Cross-Bronx Expressway, city service cuts. Housing Commissioner Roger Starr proposes "planned shrinkage" — deliberately withdrawing services from the worst areas.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Era: Koch, Co-ops & Deregulation -->
+  <div class="mb-3">
+    <div class="flex items-center gap-2 mb-2">
+      <div class="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0"></div>
+      <h4 class="text-[13px] font-bold text-white">Koch, Co-ops & Deregulation</h4>
+      <span class="text-[10px] text-slate-500">1980s–1990s</span>
+    </div>
+    <div class="ml-1.5 border-l-2 border-slate-700 pl-4 space-y-2">
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1982</div>
+        <div class="text-[11px] text-slate-300"><strong>Co-op conversion wave begins.</strong> Landlords convert rental buildings to cooperative ownership. By 1990, ~390,000 co-op units and ~100,000 condo units. NYC becomes overwhelmingly co-op for owner-occupied multifamily — unique in the US.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1986</div>
+        <div class="text-[11px] text-slate-300"><strong>Koch's Ten Year Housing Plan</strong> — Mayor Ed Koch's $5.1 billion plan to build and rehabilitate 100,000 affordable units, leveraging ~100,000 city-owned properties from tax foreclosures. Ultimately produces ~180,000 affordable units — one of the most successful municipal housing programs in US history.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1994</div>
+        <div class="text-[11px] text-slate-300"><strong>Vacancy decontrol introduced.</strong> Stabilized apartments above $2,000/month that become vacant can be permanently deregulated. Landlords also get a 20% vacancy bonus on each turnover. Over 291,000 apartments will be deregulated by 2019.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">1997</div>
+        <div class="text-[11px] text-slate-300"><strong>Rent Regulation Reform Act</strong> — Formalizes vacancy decontrol, adds high-income decontrol ($175k income + $2,000 rent). State Senate Republicans extract these in exchange for renewing rent regulation.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Era: Bloomberg Rezonings -->
+  <div class="mb-3">
+    <div class="flex items-center gap-2 mb-2">
+      <div class="w-3 h-3 rounded-full bg-teal-500 flex-shrink-0"></div>
+      <h4 class="text-[13px] font-bold text-white">Bloomberg Rezonings</h4>
+      <span class="text-[10px] text-slate-500">2002–2013</span>
+    </div>
+    <div class="ml-1.5 border-l-2 border-slate-700 pl-4 space-y-2">
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2005</div>
+        <div class="text-[11px] text-slate-300"><strong>Bloomberg-era rezonings begin.</strong> DCP rezones Williamsburg/Greenpoint waterfront from manufacturing to residential, enabling 10,000+ new apartments. Over Bloomberg's 12 years, the city rezones ~37% of NYC's land area, producing a net increase of ~180,000 buildable units.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2009</div>
+        <div class="text-[11px] text-slate-300"><strong>Hudson Yards rezoning</strong> — The largest private real estate development in US history. 28 acres of former rail yards rezoned for 18 million sq ft of commercial and residential space. Extension of the 7 train ($2.4 billion) to serve the new neighborhood.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Era: De Blasio & the Housing Crisis -->
+  <div class="mb-3">
+    <div class="flex items-center gap-2 mb-2">
+      <div class="w-3 h-3 rounded-full bg-indigo-500 flex-shrink-0"></div>
+      <h4 class="text-[13px] font-bold text-white">De Blasio & the Housing Crisis</h4>
+      <span class="text-[10px] text-slate-500">2014–2021</span>
+    </div>
+    <div class="ml-1.5 border-l-2 border-slate-700 pl-4 space-y-2">
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2014</div>
+        <div class="text-[11px] text-slate-300"><strong>Housing New York plan</strong> — Mayor de Blasio pledges to build or preserve 200,000 affordable units over 10 years (later expanded to 300,000). The most ambitious municipal affordable housing program in US history.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2016</div>
+        <div class="text-[11px] text-slate-300"><strong>Mandatory Inclusionary Housing (MIH) adopted.</strong> Developers in rezoned areas must include 25-30% permanently affordable units. First time NYC requires affordability as a condition of upzoning.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2019</div>
+        <div class="text-[11px] text-slate-300"><strong>HSTPA</strong> — The most significant strengthening of rent regulation since 1969. Eliminates vacancy decontrol, vacancy bonuses, and high-income decontrol. Caps IAIs at $15,000/15 years. Stabilized building values drop 15-40% overnight. Over 95,000 stabilized apartments subsequently lost from the rental market (warehousing).</div>
+        <div class="flex flex-wrap gap-2 mt-1">
+          <a href="https://en.wikipedia.org/wiki/Housing_Stability_and_Tenant_Protection_Act_of_2019" target="_blank" rel="noopener noreferrer" class="text-[9px] text-cyan-400 hover:text-cyan-300 underline decoration-cyan-600/40">HSTPA — Wikipedia ↗</a>
+        </div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2019</div>
+        <div class="text-[11px] text-slate-300"><strong>Local Law 97 (Climate Mobilization Act)</strong> — Buildings over 25,000 sq ft must meet carbon emission limits, with penalties of $268/ton over the limit. Compliance costs estimated at $5,000-$25,000 per unit, adding pressure to already-squeezed stabilized building finances.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2020</div>
+        <div class="text-[11px] text-slate-300"><strong>COVID-19 pandemic hits NYC.</strong> Population drops as remote workers flee. Vacancy rates spike to 5.1% — the highest in 14 years. Manhattan rents drop 15-20%. Paradoxically, the brief vacancy spike proves rents <em>can</em> fall when supply exceeds demand — exactly what YIMBY economists predicted.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2021</div>
+        <div class="text-[11px] text-slate-300"><strong>Post-COVID rent surge.</strong> Rents snap back as workers return. Manhattan median rent hits an all-time high of $4,000/month by mid-2022. The pandemic's brief rental relief evaporates. Vacancy rate falls back below 2%.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Era: The YIMBY Era -->
+  <div class="mb-3">
+    <div class="flex items-center gap-2 mb-2">
+      <div class="w-3 h-3 rounded-full bg-amber-500 flex-shrink-0"></div>
+      <h4 class="text-[13px] font-bold text-white">The YIMBY Era</h4>
+      <span class="text-[10px] text-slate-500">2022–Present</span>
+    </div>
+    <div class="ml-1.5 border-l-2 border-slate-700 pl-4 space-y-2">
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2022</div>
+        <div class="text-[11px] text-slate-300"><strong>421-a tax abatement expires.</strong> After 51 years, the legislature fails to renew NYC's primary incentive for new rental construction. New rental building permits plummet. Developers shift to condos or pause projects entirely.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2023</div>
+        <div class="text-[11px] text-slate-300"><strong>Record-low 1.4% vacancy rate</strong> — NYC Housing and Vacancy Survey finds the lowest vacancy in 50+ years. Median asking rent hits $3,500/month citywide. The "housing emergency" threshold triggering rent regulation is 5%.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2024</div>
+        <div class="text-[11px] text-slate-300"><strong>Good Cause Eviction signed</strong> (April 20, 2024). Extends eviction protections to market-rate tenants statewide. Caps rent increases at CPI + 5% (max 10%). Critically exempts buildings built after 2009 — designed to protect tenants without chilling new construction.</div>
+        <div class="flex flex-wrap gap-2 mt-1">
+          <a href="https://en.wikipedia.org/wiki/Good_cause_eviction" target="_blank" rel="noopener noreferrer" class="text-[9px] text-cyan-400 hover:text-cyan-300 underline decoration-cyan-600/40">Good Cause Eviction ↗</a>
+        </div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2024</div>
+        <div class="text-[11px] text-slate-300"><strong>485-x tax abatement enacted</strong> (June 2024). Replaces 421-a. Requires 20-25% affordable units and prevailing wages. 40-year benefit period. Attempts to restart the rental construction pipeline that froze after 421-a's expiration.</div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2024</div>
+        <div class="text-[11px] text-slate-300"><strong>City of Yes for Housing Opportunity (COYHO) passes</strong> (December 5, 2024). The most significant citywide zoning reform since 1961. Legalizes ADUs, eliminates parking minimums, enables transit-oriented development, town center zoning, and UAP. Estimated to enable 82,000+ new homes over 15 years.</div>
+        <div class="flex flex-wrap gap-2 mt-1">
+          <a href="https://www.nyc.gov/site/planning/plans/city-of-yes/city-of-yes-housing-opportunity.page" target="_blank" rel="noopener noreferrer" class="text-[9px] text-cyan-400 hover:text-cyan-300 underline decoration-cyan-600/40">City of Yes — NYC DCP ↗</a>
+        </div>
+      </div>
+      <div class="relative">
+        <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-900"></div>
+        <div class="text-[10px] text-amber-400 font-mono font-bold mb-0.5">2025</div>
+        <div class="text-[11px] text-slate-300"><strong>DOB begins accepting ADU applications</strong> (September 30, 2025). NYC homeowners can legally add basement, attic, and backyard apartments for the first time. Manhattan median rent crosses <strong>$5,000/month</strong> for the first time — up 22% from pre-pandemic levels.</div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+  <!-- /scroll container -->
+
+  <div class="mt-4 bg-amber-900/20 border border-amber-700/40 rounded-lg p-3">
+    <div class="font-bold text-amber-400 text-[13px] mb-1">The pattern</div>
+    <p class="text-[11px] text-slate-300">Every generation faces the same cycle: <strong>crisis → regulation → unintended consequences → new crisis.</strong> Tenement overcrowding led to zoning. Zoning enabled Robert Moses's clearance. Moses's destruction created community review (ULURP). ULURP empowered NIMBYs. NIMBY obstruction caused the housing shortage. The shortage drove COYHO. <em>Can supply-side reform break the cycle?</em></p>
+  </div>
+</div>
+
+<style>
+  .nyc-timeline-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .nyc-timeline-scroll::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 3px;
+  }
+  .nyc-timeline-scroll::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.6);
+    border-radius: 3px;
+  }
+  .nyc-timeline-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.8);
+  }
+  .nyc-timeline-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.6) rgba(30, 41, 59, 0.5);
+  }
+</style>

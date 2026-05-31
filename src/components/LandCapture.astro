@@ -1,0 +1,88 @@
+---
+// Visualizes the landowner-capture problem when upzoning without LVT.
+// Slider = new FAR. Bars show how the marginal value splits between
+// landowner, developer, and tenants.
+---
+
+<div class="lc-widget rounded-xl border border-gray-200 p-6 my-8 bg-white">
+  <h3 class="text-lg font-semibold mb-1">Who captures the upzoning?</h3>
+  <p class="text-sm text-gray-600 mb-4">When zoning allows more density, the marginal value has to go somewhere. Drag to upzone, and watch the surplus get captured.</p>
+
+  <label class="block mb-3">
+    <span class="text-sm">New FAR: <strong id="lc-far-val" class="font-mono">5.0</strong> (was 2.0)</span>
+    <input id="lc-far" type="range" min="2" max="15" step="0.5" value="5" class="w-full accent-[var(--accent)]" />
+  </label>
+
+  <label class="flex items-center gap-2 mb-4 text-sm">
+    <input id="lc-lvt" type="checkbox" class="accent-[var(--accent)]" />
+    Land Value Tax active (taxes away the windfall)
+  </label>
+
+  <div class="space-y-2 text-sm font-mono">
+    <div>
+      <div class="flex justify-between mb-1"><span>Landowner windfall</span><span id="lc-land-pct">75%</span></div>
+      <div class="h-5 bg-gray-200 rounded overflow-hidden">
+        <div id="lc-land-bar" class="h-full bg-orange-500 transition-all" style="width: 75%"></div>
+      </div>
+    </div>
+    <div>
+      <div class="flex justify-between mb-1"><span>Developer margin</span><span id="lc-dev-pct">15%</span></div>
+      <div class="h-5 bg-gray-200 rounded overflow-hidden">
+        <div id="lc-dev-bar" class="h-full bg-blue-500 transition-all" style="width: 15%"></div>
+      </div>
+    </div>
+    <div>
+      <div class="flex justify-between mb-1"><span>Lower rents (tenant gain)</span><span id="lc-tenant-pct">10%</span></div>
+      <div class="h-5 bg-gray-200 rounded overflow-hidden">
+        <div id="lc-tenant-bar" class="h-full bg-green-500 transition-all" style="width: 10%"></div>
+      </div>
+    </div>
+  </div>
+
+  <p id="lc-verdict" class="mt-4 text-sm text-gray-600 italic">Without LVT, upzoning is mostly a transfer to the landowner. Build cost stays the same; land cost balloons.</p>
+</div>
+
+<script>
+  const far = document.getElementById('lc-far') as HTMLInputElement;
+  const lvt = document.getElementById('lc-lvt') as HTMLInputElement;
+  const farVal = document.getElementById('lc-far-val')!;
+  const landPct = document.getElementById('lc-land-pct')!;
+  const devPct = document.getElementById('lc-dev-pct')!;
+  const tenantPct = document.getElementById('lc-tenant-pct')!;
+  const landBar = document.getElementById('lc-land-bar')!;
+  const devBar = document.getElementById('lc-dev-bar')!;
+  const tenantBar = document.getElementById('lc-tenant-bar')!;
+  const verdict = document.getElementById('lc-verdict')!;
+
+  function update() {
+    const f = Number(far.value);
+    farVal.textContent = f.toFixed(1);
+
+    // Without LVT, landowner captures ~75%, developer ~15%, tenants ~10%.
+    // With LVT, the windfall flows from landowner → city → can fund construction/subsidy,
+    // and the equilibrium shifts toward developer + tenants.
+    let land = 75, dev = 15, tenant = 10;
+    if (lvt.checked) {
+      land = 25; dev = 30; tenant = 45;
+    }
+    // The MAGNITUDE of all three grows with FAR — more upzoning = more total surplus.
+    // We're just showing the % split here.
+    landPct.textContent = land + '%';
+    devPct.textContent = dev + '%';
+    tenantPct.textContent = tenant + '%';
+    landBar.style.width = land + '%';
+    devBar.style.width = dev + '%';
+    tenantBar.style.width = tenant + '%';
+
+    if (lvt.checked) {
+      verdict.textContent = `With LVT, the windfall flows from passive land-holding to active development. Tenants get most of the marginal value back as lower rents (or as redistributed public housing).`;
+    } else if (f < 4) {
+      verdict.textContent = `Modest upzone. Landowners take the lion's share — they'd rather sit on a 2x lot than sell at the old basis.`;
+    } else {
+      verdict.textContent = `Aggressive upzone (${f.toFixed(1)}x FAR). Without LVT, landowners pocket the windfall and developers face higher acquisition costs. Most of the "supply gain" is absorbed into land prices, not rents.`;
+    }
+  }
+  far.addEventListener('input', update);
+  lvt.addEventListener('change', update);
+  update();
+</script>

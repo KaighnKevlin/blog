@@ -1,0 +1,91 @@
+---
+// Rent control endowment-effect visualization.
+// Shows how an RC tenant is locked in even when their unit no longer fits.
+---
+
+<div class="el-widget rounded-xl border border-gray-200 p-6 my-8 bg-white">
+  <h3 class="text-lg font-semibold mb-1">Rent control's golden handcuffs</h3>
+  <p class="text-sm text-gray-600 mb-4">You signed a rent-stabilized lease in 2010. Now your family grew. Why don't you move?</p>
+
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm">
+    <label class="block">
+      <span>Your RC rent: <strong id="el-rc-val" class="font-mono">$1,500</strong></span>
+      <input id="el-rc" type="range" min="600" max="3000" step="50" value="1500" class="w-full accent-[var(--accent)]" />
+    </label>
+    <label class="block">
+      <span>Current market rent: <strong id="el-mkt-val" class="font-mono">$4,200</strong></span>
+      <input id="el-mkt" type="range" min="1500" max="8000" step="100" value="4200" class="w-full accent-[var(--accent)]" />
+    </label>
+    <label class="block">
+      <span>Family size: <strong id="el-fam-val" class="font-mono">4</strong></span>
+      <input id="el-fam" type="range" min="1" max="6" step="1" value="4" class="w-full accent-[var(--accent)]" />
+    </label>
+  </div>
+
+  <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm space-y-1">
+    <div class="flex justify-between"><span>Rent savings vs market:</span><span id="el-savings" class="text-green-600">$2,700/mo</span></div>
+    <div class="flex justify-between"><span>Endowment-weighted breakeven:</span><span id="el-breakeven">$2,250</span></div>
+    <div class="flex justify-between"><span>Family size pressure:</span><span id="el-cramped" class="text-amber-600">Cramped (need 3BR)</span></div>
+    <div class="pt-2 border-t border-gray-300 mt-2 flex justify-between font-bold">
+      <span>Move?</span><span id="el-decision" class="text-red-600">Stay (locked in)</span>
+    </div>
+  </div>
+
+  <details class="mt-3 text-xs text-gray-600">
+    <summary class="cursor-pointer">How the model works</summary>
+    <p class="mt-2">Behavioral econ (Thaler) tells us people overvalue what they have by ~1.5×. For an RC tenant, the breakeven to voluntarily move isn't "market &lt; my RC rent" but "market &lt; my RC rent ÷ 1.5". This means the unit gets <em>misallocated</em>: empty-nesters keep 4-bedrooms, families squeeze into studios. The model calls this the "incumbency penalty" — RC stock is functionally frozen.</p>
+  </details>
+</div>
+
+<script>
+  const rc = document.getElementById('el-rc') as HTMLInputElement;
+  const mkt = document.getElementById('el-mkt') as HTMLInputElement;
+  const fam = document.getElementById('el-fam') as HTMLInputElement;
+  const rcVal = document.getElementById('el-rc-val')!;
+  const mktVal = document.getElementById('el-mkt-val')!;
+  const famVal = document.getElementById('el-fam-val')!;
+  const savings = document.getElementById('el-savings')!;
+  const breakeven = document.getElementById('el-breakeven')!;
+  const cramped = document.getElementById('el-cramped')!;
+  const decision = document.getElementById('el-decision')!;
+
+  const ENDOWMENT = 1.5;
+
+  function update() {
+    const r = Number(rc.value);
+    const m = Number(mkt.value);
+    const f = Number(fam.value);
+
+    rcVal.textContent = `$${r.toLocaleString()}`;
+    mktVal.textContent = `$${m.toLocaleString()}`;
+    famVal.textContent = String(f);
+    savings.textContent = `$${(m - r).toLocaleString()}/mo`;
+    const be = Math.round(r * ENDOWMENT);
+    breakeven.textContent = `$${be.toLocaleString()}`;
+
+    let crampedText = 'Fits well';
+    let crampedClass = 'text-green-600';
+    if (f >= 4) { crampedText = 'Cramped (need 3BR)'; crampedClass = 'text-amber-600'; }
+    if (f >= 5) { crampedText = 'Very cramped (need 4BR)'; crampedClass = 'text-red-600'; }
+    cramped.textContent = crampedText;
+    cramped.className = crampedClass;
+
+    // Decision logic: endowment effect + family pressure
+    const wouldMoveEcon = m < be;
+    const familyForce = f >= 5; // only severe overcrowding overrides endowment
+    if (wouldMoveEcon && f < 4) {
+      decision.textContent = 'Move (market rent within endowment range)';
+      decision.className = 'text-blue-600';
+    } else if (familyForce && m < r * 2.2) {
+      decision.textContent = 'Move (family pressure outweighs lock-in)';
+      decision.className = 'text-blue-600';
+    } else {
+      decision.textContent = 'Stay (locked in)';
+      decision.className = 'text-red-600';
+    }
+  }
+  rc.addEventListener('input', update);
+  mkt.addEventListener('input', update);
+  fam.addEventListener('input', update);
+  update();
+</script>
