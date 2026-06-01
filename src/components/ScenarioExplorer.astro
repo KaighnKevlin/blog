@@ -1,68 +1,70 @@
 ---
-// Compares the 10 most informative scenarios from the 48-scenario run.
-// Numbers pulled from the latest engine run (post voluntary-departure fix).
+// 10 most informative scenarios from the 48-scenario run.
+// Ranked by 2070 real-rent + housed-count (no letter grades — those are arbitrary).
 ---
 
 <div class="se-widget rounded-xl border border-gray-200 p-6 my-8 bg-white">
-  <h3 class="text-lg font-semibold mb-1">48 policy scenarios, ranked</h3>
-  <p class="text-sm text-gray-600 mb-4">After 50 simulated years (2020-2070), here's where each policy ends up. Click a row to see what's in the mix.</p>
+  <h3 class="text-lg font-semibold mb-1">10 policy bundles after 50 years</h3>
+  <p class="text-sm text-gray-600 mb-4">After 600 simulated months (2020-2070), here's how each bundle ends up. Click a row to see what's inside.</p>
 
   <div class="grid grid-cols-3 sm:grid-cols-6 gap-1 text-[10px] uppercase text-gray-500 mb-1 font-mono px-2">
-    <div class="col-span-2 sm:col-span-2">Policy</div>
-    <div class="text-right">Grade</div>
+    <div class="col-span-2 sm:col-span-2">Bundle</div>
     <div class="text-right">Rent (2025$)</div>
-    <div class="text-right hidden sm:block">Housed</div>
+    <div class="text-right hidden sm:block">vs base</div>
+    <div class="text-right">Housed</div>
     <div class="text-right hidden sm:block">Built</div>
   </div>
   <div id="se-rows" class="space-y-px font-mono text-xs"></div>
 
-  <p class="mt-4 text-xs text-gray-600 italic">No scenario achieves an A. The best — full YIMBY supply reforms paired with vouchers — still leaves a million households without stable housing 50 years out.</p>
+  <p class="mt-4 text-xs text-gray-600 italic">Don't take the magnitudes too literally — this is one model with one set of parameters. The ordinal ranking is more robust than the absolute numbers. The clear pattern: combinations outperform individual policies, and pure rent control is destructive across every metric.</p>
 </div>
 
 <script>
-  type Row = { name: string; grade: string; rent: number; rentDelta: number; housed: string; built: string; bundle: string; };
+  type Row = { name: string; rent: number; rentDelta: number; housed: string; built: string; bundle: string; tier: 'best' | 'good' | 'middle' | 'bad' | 'worst' };
 
   const rows: Row[] = [
-    { name: 'everything-yimby', grade: 'B', rent: 1682, rentDelta: -62, housed: '1.94M', built: '2.82M',
-      bundle: 'All COYHO + LVT + preemption + full cost reform + FAR 20 everywhere. Best supply-side scenario.' },
-    { name: 'delayed-yimby', grade: 'B', rent: 2752, rentDelta: -38, housed: '1.83M', built: '2.28M',
+    { name: 'everything-yimby', rent: 1682, rentDelta: -62, housed: '1.94M', built: '2.82M', tier: 'best',
+      bundle: 'All COYHO + LVT + state preemption + full cost reform + FAR 20 everywhere. Best supply-side scenario.' },
+    { name: 'delayed-yimby', rent: 2752, rentDelta: -38, housed: '1.83M', built: '2.28M', tier: 'best',
       bundle: 'Full YIMBY but starting at month 120 (2030). Lost a decade — but rents still drop 38%.' },
-    { name: 'yimby+rc50', grade: 'C', rent: 3216, rentDelta: -27, housed: '1.53M', built: '2.10M',
+    { name: 'yimby+rc50', rent: 3216, rentDelta: -27, housed: '1.53M', built: '2.10M', tier: 'good',
       bundle: 'Full YIMBY + 50% rent stabilization coverage. Supply gains partially captured by RC.' },
-    { name: 'yimby+vouchers', grade: 'C', rent: 3233, rentDelta: -27, housed: '1.53M', built: '1.89M',
-      bundle: 'Full YIMBY + 20 Section 8 vouchers/month. Demand-side inflation eats some of the supply win.' },
-    { name: 'nuclear-yimby', grade: 'C', rent: 2745, rentDelta: -38, housed: '1.25M', built: '1.76M',
-      bundle: 'COYHO + LVT + state preemption + FAR 10 upzone. Major supply, but population fled the chaos.' },
-    { name: 'upzone-all', grade: 'D', rent: 3991, rentDelta: -10, housed: '1.17M', built: '1.05M',
+    { name: 'yimby+vouchers', rent: 3233, rentDelta: -27, housed: '1.53M', built: '1.89M', tier: 'good',
+      bundle: 'Full YIMBY + 20 Section 8 vouchers/month. Modest demand-side rent inflation, big inequality wins.' },
+    { name: 'nuclear-yimby', rent: 2745, rentDelta: -38, housed: '1.25M', built: '1.76M', tier: 'good',
+      bundle: 'COYHO + LVT + state preemption + FAR 10 upzone. Major supply, but some population fled the chaos.' },
+    { name: 'upzone-all', rent: 3991, rentDelta: -10, housed: '1.17M', built: '1.05M', tier: 'middle',
       bundle: 'Upzone everywhere to FAR 10 but no other reforms. Land cost capture eats most of the gain.' },
-    { name: 'baseline', grade: 'D', rent: 4433, rentDelta: 0, housed: '0.89M', built: '0.45M',
+    { name: 'baseline', rent: 4433, rentDelta: 0, housed: '0.89M', built: '0.45M', tier: 'middle',
       bundle: 'Status quo. No policy intervention. 3M households end up unhoused or fled by 2070.' },
-    { name: 'good-cause', grade: 'F', rent: 4282, rentDelta: 0, housed: '0.82M', built: '0.48M',
+    { name: 'good-cause', rent: 4282, rentDelta: 0, housed: '0.82M', built: '0.48M', tier: 'bad',
       bundle: 'Good Cause Eviction (rent control lite) alone. Slight tenant protection, no supply boost.' },
-    { name: 'affordable-100', grade: 'F', rent: 7909, rentDelta: 78, housed: '0.97M', built: '0M',
+    { name: 'affordable-100', rent: 7909, rentDelta: 78, housed: '0.97M', built: '0M', tier: 'worst',
       bundle: '100% mandatory affordable on every project. Construction collapses. Rents double on remaining stock.' },
-    { name: 'rent-control', grade: 'F', rent: 5032, rentDelta: 13, housed: '0.35M', built: '0M',
+    { name: 'rent-control', rent: 5032, rentDelta: 13, housed: '0.35M', built: '0M', tier: 'worst',
       bundle: 'Universal rent control. 6M (86%) of households flee. Construction zero. Worst outcome in the dataset.' },
   ];
 
   const container = document.getElementById('se-rows')!;
+  const tierColor = (t: Row['tier']) => ({
+    best: 'border-l-emerald-500',
+    good: 'border-l-blue-500',
+    middle: 'border-l-amber-500',
+    bad: 'border-l-orange-500',
+    worst: 'border-l-red-500',
+  }[t]);
 
-  const gradeColor = (g: string) => ({
-    A: 'text-emerald-600', B: 'text-blue-600', C: 'text-amber-600',
-    D: 'text-orange-600', F: 'text-red-600'
-  }[g] ?? 'text-gray-500');
-
-  rows.forEach((r, i) => {
+  rows.forEach((r) => {
     const row = document.createElement('div');
-    row.className = 'grid grid-cols-3 sm:grid-cols-6 gap-1 py-1.5 px-2 hover:bg-gray-50 cursor-pointer rounded';
-    const deltaStr = r.rentDelta === 0 ? '' :
-      r.rentDelta > 0 ? ` <span class="text-red-500">+${r.rentDelta}%</span>` :
-                        ` <span class="text-green-600">${r.rentDelta}%</span>`;
+    row.className = `grid grid-cols-3 sm:grid-cols-6 gap-1 py-1.5 px-2 hover:bg-gray-50 cursor-pointer rounded border-l-4 ${tierColor(r.tier)}`;
+    const deltaStr = r.rentDelta === 0 ? '<span class="text-gray-400">—</span>' :
+      r.rentDelta > 0 ? `<span class="text-red-500">+${r.rentDelta}%</span>` :
+                        `<span class="text-green-600">${r.rentDelta}%</span>`;
     row.innerHTML = `
       <div class="col-span-2 sm:col-span-2 font-medium">${r.name}</div>
-      <div class="text-right font-bold ${gradeColor(r.grade)}">${r.grade}</div>
-      <div class="text-right">$${r.rent.toLocaleString()}${deltaStr}</div>
-      <div class="text-right hidden sm:block text-gray-700">${r.housed}</div>
+      <div class="text-right">$${r.rent.toLocaleString()}</div>
+      <div class="text-right hidden sm:block">${deltaStr}</div>
+      <div class="text-right text-gray-700">${r.housed}</div>
       <div class="text-right hidden sm:block text-gray-700">${r.built}</div>
     `;
     const detail = document.createElement('div');
