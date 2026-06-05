@@ -1,0 +1,73 @@
+---
+title: "Kaighnbot - using claude code as open claw to manage my social life, annoy my friends, and profit!"
+description: "I run Claude Code on a macbook in the corner of my apartment. It autoresponds to my texts, makes plans, proactively texts people to hang, and manages my calendar. No code. Glorious results. Mixed reactions."
+pubDate: "Jun 05 2026"
+---
+
+I've always hated texting. People nowadays want me to bare my soul over imessage, dump my trauma, give them a whole life debrief, and more.
+
+The problem? I'm extroverted. And I looove to hang. In person of course. Metaverse who?
+
+So texting? It's a necessary evil. A means to a glorious end. And I've missed too many hangs just because I can't be bothered to check my phone. I even went without a phone for ~3 months in 2016, a fun exercise in not being dateable (a life-long exercise, sadly, but let's not get sidetracked).
+
+Anyway, no more preamble. No fluff. Wtf is this post about? TLDR:
+
+- I run Claude Code on my macbook, which is plugged in the corner of my apt.
+- It autoresponds to my texts, makes plans, proactively texts people to hang, and manages my calendar.
+- The result? Glorious. The reactions? Mixed, but my quarterly hangs per week OKR metrics don't lie.
+
+How? Well, I was this close to trying out open claw because why the fuck not? Security through absurdity as I always say.
+
+But then I realized that my old flame, Claude Code, had been rapidly adding open claw-like features. Sigh. Here's another $100 anthropic. I swear they don't pay me (yet? Come on!).
+
+I tried to make a Kaighnbot in 2023. Same idea. I coded it by hand with some help from gpt, but vibe coding wasn't a big thing back in those olden days. I made a website, integrated with the gpt api and twilio api to send texts through a different number (twilio = surprisingly expensive!), stored the messages in a db so I could replay them every gpt call, figured out when the text convo had an outcome and put it on my google cal… but I abandoned the project. It kinda worked, but it required too many 30 hour weeks of coding, and turns out… if you just wanna hang with your friends, there's a much faster way to do it!
+
+But it's 2026 now and the clawde-father showed the world how easy it is to make kaighnbot a reality. So my friends, join me as I disrupt the hang industry.
+
+TLDR - surprisingly easy, no code, and great results!
+
+## How to spam your friends, for dummies
+
+- Get a mac.
+- Make a separate profile. This will be our "shitty sandbox"
+- In that profile, download claude code.
+- Use the imessage plugin.
+- Allowlist a few trusted (consenting) friends' numbers.
+- Run this and save to alias: `caffeinate -is claude --channels plugin:imessage@claude-plugins-official --dangerously-skip-permissions --continue`
+  - Caffeinate: kaighnbot will stay on even if the mac is shut, if the mac is still charging.
+  - Skip permissions: the cruise control for cool.
+- Talk to it, explain its purpose, and profit. Give it your phone number first so you can text it on the go.
+
+And that's it! No code baybeeee.
+
+Will you get hacked by your friends? Big time. Will it make you laugh? Absolutely. Claude opus is pretty good at avoiding the "rm -rf" trolling from my friends, but I may have instructed it to "feel free to leak some details between convos for funsies" and that had some exciting results!
+
+## The Good
+
+- Scheduling parties
+  - "Hey, text all of my [Dumb Friend Group Name] friends and see when they can come over for dinner next week. I'll make rice and salmon bowls!"
+    - It'll text all 13 people, get their availabilities, text me with final recommendation for a date and I'll confirm. It'll mass text people a calendar invite and any FAQs only need to be asked once and then it's in the knowledge base - i.e. my address, what to bring, etc.
+- Having more hangs - less scheduling friction
+  - People were intrigued by kaighnbot, and I've been having dinners with people I haven't hung out with since college.
+  - An old friend I'll refer to as "David" got into a two-day argument with kaighnbot about AI. Kaighnbot pushed back respectfully - kinda from a "do you want to kill me?" angle. And at the end of those long two days kaighnbot emerged with a brunch reservation with just me and David and we caught up for the first time in years.
+  - People can text me to immediately see when I'm free and lock in a plan.
+- Proactive mode
+  - If I want, I can trigger it to fill my calendar. No plans Friday night? Check in with this tiered list of people, and if one tier doesn't respond in an hour move on to the next one.
+- Reducing social cost
+  - If I text someone to hang out, that's a social risk. It hurts when they can't. I lose part of my soul, forever snatched away by the fact that I was needy enough to need someone.
+  - For this reason, people are a bit weird about rejecting you, even if they're busy.
+  - But with kaighnbot - people DGAF. I'll fire off hang requests and people will fire back the rejections. No feelings hurt, just pure business.
+- Genuinely funny
+  - Gave kaighnbot access to my Home Assistant. Suddenly, people are playing Baby Got Back at full blast at 10am on a saturday, closing my blinds, and turning my bedroom cold.
+
+## The Fails
+
+- Spoiling a birthday surprise
+  - Kaighnbot automatically texts people on their birthdays. Texted one of my friends something like "happy birthday! Can't wait to hang with you tonight on the Pier!" Mfer read my partiful calendar and spoiled the surprise 🙁
+- h4ckers
+  - About 70% of the volume of texts kaighnbot receives are social engineering attempts. Some tech-savvy friends got kaighnbot to read arbitrary texts from other convos, send texts to other people, and more! One guy sought solace after his "dog died" - only to get kaighnbot's sympathy and to run 'rm -rf'. But don't worry, claude don't take no shit.
+  - I patched all these vulnerabilities by asking claude nicely in English, which is basically bulletproof. So yeah. And now it has several memory.md files on some of my friends that read more like an FBI most-wanted profile.
+
+Now kaighnbot is a pseudo personal assistant for me - hooked up to my home, letterboxd, can recommend movies, set apple reminders, make calendars, look up events and proactively schedule hangs when I don't have anything going on. All for the small price of being "that guy" - but I've paid that steep price my whole life.
+
+So get started today before Anthropic sees this blog! Stop texting your friends to hang out, and instead spend a few hours getting AI to message your friends for you! Big Hang doesn't want you to know this one easy trick.
