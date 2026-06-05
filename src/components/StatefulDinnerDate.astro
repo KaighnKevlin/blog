@@ -1,0 +1,319 @@
+---
+// An interactive game dramatizing a stateful connection. You hold a long-lived
+// "session" with a restaurant and must reach "meal served" (5 steps) before the
+// connection drains to zero. Tap keepalive (small talk) to survive, handle random
+// interrupts (server clocks out, you wander off, kitchen stalls), and the longer
+// the session lasts the faster it decays — modelling why long-lived remote/stateful
+// connections are fragile. The escape hatch ("just send a REST request") is the joke
+// and the lesson: stateless wins.
+---
+
+<div class="dd-widget rounded-xl border border-gray-200 p-6 my-8 bg-white relative overflow-hidden select-none">
+  <div class="flex items-baseline justify-between mb-1">
+    <h3 class="text-lg font-semibold">🍽️ The Stateful Dinner Date</h3>
+    <span class="text-[10px] text-gray-400 uppercase tracking-wider font-mono">a game</span>
+  </div>
+  <p class="text-sm text-gray-600 mb-4">
+    You opened a <strong>stateful connection</strong> to the restaurant. Reach <strong>meal&nbsp;served</strong> (5 steps) before the connection drops. Tap <strong>small talk</strong> to keep it alive — but the longer the night drags on, the faster it decays.
+  </p>
+
+  <!-- meters -->
+  <div class="flex flex-wrap items-center gap-4 mb-3">
+    <div class="flex-1 min-w-[180px]">
+      <div class="flex justify-between text-xs mb-1">
+        <span class="font-medium">Connection</span>
+        <span id="dd-conn-pct" class="font-mono">100%</span>
+      </div>
+      <div class="h-3 rounded-full bg-gray-100 overflow-hidden">
+        <div id="dd-conn-bar" class="h-full rounded-full" style="width:100%;background:#10b981"></div>
+      </div>
+    </div>
+    <div class="text-xs font-mono text-gray-500 text-right leading-5">
+      <div>Attempt #<span id="dd-attempts">1</span></div>
+      <div><span id="dd-time">0:00</span> elapsed</div>
+    </div>
+  </div>
+
+  <!-- stage progress -->
+  <div class="flex items-center gap-2 mb-5">
+    <div id="dd-pips" class="flex items-center gap-1.5"></div>
+    <span id="dd-stage-label" class="text-xs text-gray-500 font-medium ml-1"></span>
+  </div>
+
+  <!-- play area -->
+  <div class="space-y-3">
+    <button id="dd-advance"
+      class="w-full px-4 py-3 rounded-lg font-semibold text-white bg-violet-600 hover:bg-violet-700 active:scale-[.99] transition disabled:opacity-40 disabled:cursor-not-allowed">
+    </button>
+    <button id="dd-keepalive"
+      class="w-full px-4 py-2.5 rounded-lg font-medium border border-gray-300 bg-white hover:bg-gray-50 active:scale-[.99] transition disabled:opacity-50">
+    </button>
+    <div id="dd-event-slot" class="min-h-[3.25rem]"></div>
+  </div>
+
+  <!-- footer / escape hatch -->
+  <div class="mt-4 pt-4 border-t border-gray-100 text-center">
+    <button id="dd-rest" class="px-5 py-3 rounded-lg font-semibold text-sm border border-gray-300 text-gray-700 hover:bg-gray-50 active:scale-[.99] transition">
+      😤 Forget it — just send a REST request
+    </button>
+    <div id="dd-hint" class="text-[11px] text-amber-600 mt-2 hidden">↑ psst. there's an easier way.</div>
+  </div>
+
+  <!-- drop flash -->
+  <div id="dd-flash" class="absolute inset-0 hidden flex-col items-center justify-center bg-red-600/95 text-white text-center z-10 px-6">
+    <div class="text-2xl font-bold mb-1">💥 Connection reset by peer</div>
+    <div class="text-sm opacity-90">The session is gone. Start over.</div>
+  </div>
+
+  <!-- end overlay (win / rest) -->
+  <div id="dd-overlay" class="absolute inset-0 hidden flex-col items-center justify-center bg-white/98 p-6 text-center z-20"></div>
+</div>
+
+<script>
+  type Status = 'playing' | 'won' | 'rest';
+
+  const $ = (id: string) => document.getElementById(id)!;
+  const widget = document.querySelector('.dd-widget') as HTMLElement;
+  if (widget) {
+    const connPct = $('dd-conn-pct');
+    const connBar = $('dd-conn-bar') as HTMLElement;
+    const attemptsEl = $('dd-attempts');
+    const timeEl = $('dd-time');
+    const pips = $('dd-pips');
+    const stageLabel = $('dd-stage-label');
+    const advanceBtn = $('dd-advance') as HTMLButtonElement;
+    const keepaliveBtn = $('dd-keepalive') as HTMLButtonElement;
+    const eventSlot = $('dd-event-slot');
+    const restBtn = $('dd-rest') as HTMLButtonElement;
+    const hint = $('dd-hint');
+    const flash = $('dd-flash');
+    const overlay = $('dd-overlay');
+
+    // Order steps. STEPS[i] is the action that advances you FROM step i to i+1.
+    const STEPS = [
+      { action: '🪑 Get seated', short: 'get seated' },
+      { action: '🍷 Order drinks', short: 'order drinks' },
+      { action: '🍔 Order food', short: 'order food' },
+      { action: '🧑‍🍳 Send order to the kitchen', short: 'fire the order' },
+      { action: '🍽️ Receive your meal', short: 'get your meal' },
+    ];
+    const DONE_LABELS = ['Seated', 'Drinks in', 'Food ordered', 'Cooking…', 'Served!'];
+
+    const INTERRUPTS = [
+      '🔔 Your server clocked out — flag the replacement',
+      '🚻 You wandered to the bathroom — find your table',
+      '🧑‍🍳 Kitchen is slammed — wave them down',
+      '🍷 Wrong drink arrived — send it back',
+      '💸 Rumor: the place is going under — settle up fast',
+      '🔑 Your OAuth token expired — re-authenticate with the host',
+    ];
+
+    const TICK = 100; // ms
+    const KEEPALIVE_GAIN = 22;
+    const KEEPALIVE_COOLDOWN = 650;
+    const ADVANCE_COST = 6;
+    const EVENT_TIME = 3500;
+    const EVENT_EXPIRE_HIT = 28;
+    const EVENT_RESOLVE_GAIN = 10;
+
+    type EventState = { label: string; timeLeft: number } | null;
+
+    let conn = 100;
+    let stage = 0;
+    let attempts = 1;
+    let elapsed = 0;
+    let keepaliveCd = 0;
+    let spawnTimer = 5000;
+    let evt: EventState = null;
+    let status: Status = 'playing';
+    let frozen = false; // pauses decay during the drop flash
+
+    function fmtTime(ms: number) {
+      const s = Math.floor(ms / 1000);
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    }
+
+    function scheduleSpawn() {
+      spawnTimer = 4000 + Math.random() * 3000;
+    }
+
+    function spawnEvent() {
+      const label = INTERRUPTS[Math.floor(Math.random() * INTERRUPTS.length)];
+      evt = { label, timeLeft: EVENT_TIME };
+      eventSlot.innerHTML = `
+        <button id="dd-evt-btn" class="w-full text-left px-4 py-2.5 rounded-lg font-medium text-white bg-rose-500 hover:bg-rose-600 active:scale-[.99] transition animate-pulse">
+          <div class="flex items-center justify-between gap-2">
+            <span>${label}</span>
+            <span class="text-xs font-mono opacity-90 shrink-0">tap!</span>
+          </div>
+          <div class="h-1 mt-2 rounded bg-white/30 overflow-hidden">
+            <div id="dd-evt-bar" class="h-full bg-white" style="width:100%"></div>
+          </div>
+        </button>`;
+      $('dd-evt-btn').addEventListener('click', resolveEvent);
+    }
+
+    function clearEvent() {
+      evt = null;
+      eventSlot.innerHTML = '';
+    }
+
+    function resolveEvent() {
+      if (status !== 'playing' || !evt) return;
+      conn = Math.min(100, conn + EVENT_RESOLVE_GAIN);
+      clearEvent();
+      scheduleSpawn();
+      render();
+    }
+
+    function drop() {
+      attempts++;
+      stage = 0;
+      conn = 100;
+      clearEvent();
+      scheduleSpawn();
+      keepaliveCd = 0;
+      if (attempts >= 4) hint.classList.remove('hidden');
+      // brief freeze + flash
+      frozen = true;
+      flash.style.display = 'flex';
+      setTimeout(() => {
+        flash.style.display = 'none';
+        frozen = false;
+      }, 1100);
+      render();
+    }
+
+    function win() {
+      status = 'won';
+      showOverlay(`
+        <div class="text-3xl mb-2">🍽️🎉</div>
+        <div class="text-lg font-bold mb-1">Your meal is served.</div>
+        <div class="text-sm text-gray-600 mb-4">You held a stateful connection together for <span class="font-mono">${fmtTime(elapsed)}</span> across <span class="font-mono">${attempts}</span> attempt${attempts === 1 ? '' : 's'}.</div>
+      `);
+    }
+
+    function bailToRest() {
+      status = 'rest';
+      showOverlay(`
+        <div class="text-3xl mb-2">⚡️</div>
+        <div class="font-mono text-sm text-emerald-700 mb-2">GET /dinner → 200 OK · 196ms</div>
+        <div class="text-lg font-bold mb-1">🍽️ Meal served.</div>
+        <div class="text-sm text-gray-600 mb-4 max-w-sm">You fired one stateless request and got a response. No connection to babysit, nobody to wine and dine.</div>
+      `);
+    }
+
+    function showOverlay(inner: string) {
+      overlay.innerHTML = `
+        ${inner}
+        <button id="dd-replay" class="px-4 py-2 rounded-lg font-semibold text-white bg-violet-600 hover:bg-violet-700 transition">Play again</button>
+      `;
+      overlay.style.display = 'flex';
+      $('dd-replay').addEventListener('click', reset);
+    }
+
+    function reset() {
+      conn = 100; stage = 0; attempts = 1; elapsed = 0;
+      keepaliveCd = 0; evt = null; status = 'playing'; frozen = false;
+      scheduleSpawn();
+      eventSlot.innerHTML = '';
+      overlay.style.display = 'none';
+      flash.style.display = 'none';
+      hint.classList.add('hidden');
+      render();
+    }
+
+    function render() {
+      const pct = Math.max(0, Math.round(conn));
+      connPct.textContent = `${pct}%`;
+      connBar.style.width = `${Math.max(0, conn)}%`;
+      connBar.style.background = conn > 50 ? '#10b981' : conn > 25 ? '#f59e0b' : '#ef4444';
+      attemptsEl.textContent = String(attempts);
+      timeEl.textContent = fmtTime(elapsed);
+
+      // pips
+      pips.innerHTML = '';
+      for (let i = 0; i < STEPS.length; i++) {
+        const dot = document.createElement('span');
+        dot.className = 'w-2.5 h-2.5 rounded-full transition-colors';
+        dot.style.background = i < stage ? '#10b981' : '#e5e7eb';
+        dot.title = DONE_LABELS[i];
+        pips.appendChild(dot);
+      }
+      stageLabel.textContent = stage >= STEPS.length ? 'Served!' : `Next: ${STEPS[stage].short}`;
+
+      // advance button: blocked while an interrupt is pending
+      if (stage < STEPS.length) {
+        advanceBtn.textContent = evt ? '⛔ Handle the interruption first' : STEPS[stage].action;
+        advanceBtn.disabled = !!evt || status !== 'playing';
+      }
+
+      // keepalive cooldown state
+      if (keepaliveCd > 0) {
+        keepaliveBtn.textContent = '💬 …they’re still talking';
+        keepaliveBtn.disabled = true;
+      } else {
+        keepaliveBtn.textContent = '💬 Make small talk (keepalive)';
+        keepaliveBtn.disabled = status !== 'playing';
+      }
+
+      // event timer bar
+      if (evt) {
+        const bar = document.getElementById('dd-evt-bar');
+        if (bar) bar.style.width = `${(evt.timeLeft / EVENT_TIME) * 100}%`;
+      }
+    }
+
+    function tick() {
+      if (status !== 'playing' || frozen) return;
+      elapsed += TICK;
+      if (keepaliveCd > 0) keepaliveCd = Math.max(0, keepaliveCd - TICK);
+
+      // decay scales with how deep the session is — long sessions are fragile
+      const baseDrain = (8 + stage * 3) / 10;
+      const drain = baseDrain * (evt ? 2.0 : 1.0);
+      conn -= drain;
+
+      if (evt) {
+        evt.timeLeft -= TICK;
+        if (evt.timeLeft <= 0) {
+          conn -= EVENT_EXPIRE_HIT;
+          clearEvent();
+          scheduleSpawn();
+        }
+      } else {
+        spawnTimer -= TICK;
+        if (spawnTimer <= 0) spawnEvent();
+      }
+
+      if (conn <= 0) { drop(); return; }
+      render();
+    }
+
+    advanceBtn.addEventListener('click', () => {
+      if (status !== 'playing' || evt || stage >= STEPS.length) return;
+      conn -= ADVANCE_COST;
+      stage++;
+      if (stage >= STEPS.length) { win(); return; }
+      // advancing strains the session: chance to trigger an interrupt
+      if (!evt && Math.random() < 0.3 + stage * 0.08) spawnEvent();
+      if (conn <= 0) { drop(); return; }
+      render();
+    });
+
+    keepaliveBtn.addEventListener('click', () => {
+      if (status !== 'playing' || keepaliveCd > 0) return;
+      conn = Math.min(100, conn + KEEPALIVE_GAIN);
+      keepaliveCd = KEEPALIVE_COOLDOWN;
+      render();
+    });
+
+    restBtn.addEventListener('click', () => {
+      if (status === 'playing') bailToRest();
+    });
+
+    scheduleSpawn();
+    render();
+    setInterval(tick, TICK);
+  }
+</script>

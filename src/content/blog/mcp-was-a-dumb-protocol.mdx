@@ -1,0 +1,73 @@
+---
+title: "MCP was a dumb protocol"
+description: "A hater's history of MCP: how it won on local demos, got over-extrapolated to remote, and quietly lost the use case to plain APIs and a bash terminal."
+pubDate: "Jun 05 2026"
+---
+
+import StatefulDinnerDate from '../../components/StatefulDinnerDate.astro';
+
+MCP is the USB-C of AI! [MCP is dead](https://www.quandri.io/engineering-blog/mcp-is-dead), [long live MCP](https://chrlschn.dev/blog/2026/03/mcp-is-dead-long-live-mcp/)! [Long live the CLI](https://ejholmes.github.io/2026/02/28/mcp-is-dead-long-live-the-cli.html)! [MCP is a fad](https://tombedor.dev/mcp-is-a-fad/)! [It's wrong about everything](https://blog.sshh.io/p/everything-wrong-with-mcp)! Wait, [is it dead](https://ismcpdead.com/)? [Skills are all you need](https://simonwillison.net/2025/Oct/16/claude-skills/)!
+
+Listen, I'm not here to join a holy war. MCP, CLI, English skills + a bash terminal - whatever floats your boat.
+
+I just look around and find that we don't have enough AI thought leaders, so I'm here to answer the call. After all, why build something when you can talk about how other people build things?
+
+Let me give you a dumb person's (me) take on the history of MCP.
+
+It all started in fall 2024, when Anthropic singlehandedly invented a way to make an LLM do something other than cure the male loneliness epidemic (cured!). Right around Thanksgiving dinner, someone showed me the blog post. I disappointed them with a reaction of "what the actual fuck is this shit?"
+
+Seriously, who the fuck thought of this shit? We're gonna run an actual server as an intermediary between your fuck-ass chatbot and my fuck-ass api? Just to give the chatbot some english about what my api can do? I run servers for a living… no thank you!
+
+But, I was just a hater. MCP took off. It captured the industry's heart and imagination. Did it ever produce something useful? I'm sure it has… just can't name it off the top of my head. But the vibes man. Those vibes go brrrr.
+
+## What was it even trying to solve?
+
+So let's put down the haterade for a second. What problems was MCP trying to solve?
+
+- **"The N x M problem"** - everyone wanted their chatbot to talk to google drive, and slack, and a bunch of websites. Every chatbot dev had to reimplement an AI-friendly client for each website.
+- **"The OAuth problem"** - OAuth is that thing that pops up saying "do you give x site permission to fuck your shit up on this other y site?" It's a real pain in the ass from what I hear.
+
+
+Tbf, these are good problems to solve! And MCP was actually better than what people were doing at the time. But people tried to use MCP for *everything*. They heard MCP "server" and actually thought it was a good idea to host an MCP server. Fools!
+
+See, the thing is - everyone tried MCP locally. That shit was good. Your local agent loop could make calls to a local MCP process, and it was blazing fast, reliable, and extensible. The thing is, MCP capitalized on these local demos and dev workflows and then failed when it came to actually remotely wrapping remote APIs. Cursor switched out whatever the hell they were doing and started using MCP. And then OpenAI & Google announced support, and the rest is history.
+
+## Then the backlash
+
+But now there's a backlash. All these engineers tried to make *remote* MCP work, and if you talk with any of them they'll say the hype was a bunch of horse shit. Why? There's a bunch of problems, but basically - *local* is a lot different than remote, and **stateful is BAD actually**.
+
+Everyone is gangster until they swap out the transport protocol from a local stateful connection to a remote handshake and open connection. My shitty ass 2017 Mac talking to itself? Turns out, a surprisingly reliable environment. Two cloud tasks maintaining a connection? Unsurprisingly, not great.
+
+If you've ever done a system design interview, you know - stateful BAD, stateless GOOD. If you want something, fire off a request, and then get something back. This is REST. It works pretty darn good.
+
+Can you imagine if REST was actually a dinner date, where you needed to wine and dine the server first before you got a response? It'd go something like:
+
+- You sit down, start some small talk with the server and ask them how their GME is doing.
+- The server comes back for a drinks order.
+- Mid-shift, the server clocks out and introduces you to a replacement. It's unclear who your tip will actually go to
+- You get up to go to the bathroom.
+- You get lost on the way back, needing to flag down a host.
+- You find your table, but actually the server unfortunately was serving too many tables, so now you have to wait.
+- They get fired mid-shift because the business is going under.
+
+You get the idea.
+
+To illustrate, I spent months on this highly accurate simulation software, where a locally running LLM actively physically simulates the atoms inside the restaurant: 
+
+<StatefulDinnerDate />
+
+## Why was it stateful in the first place?
+
+So why was MCP stateful? I have no fucking clue. Who doesn't want a bidirectional stream between my many chatbots so I can settle up my dinner Splitwise? I dined alone, but still...
+
+Little did we know. We just wanted to wrap APIs. Not relive *Snow Crash*.
+
+And to Anthropic's credit, they've realized this! No hate. They've apparently been hard at work removing tons of shit from MCP to make it make sense, e.g. [a stateless mode](https://blog.modelcontextprotocol.io/posts/2025-12-19-mcp-transport-future/).
+
+## The real MCP was inside us the whole time
+
+Little did we realize though, that turns out the real MCP was inside us the whole time. Turns out, API's are actually pretty rad. Like, you can call them in any language, they're REST and stateless, and the models got pretty good at just making API calls on the fly. The "M x N problem" was solved by technology from 1951.
+
+I think the industry also didn't realize how powerful *local* would be. Most of the successful AI dev applications are local - famously, Claude Code. Turns out, agent loops aren't that hard, and you can iterate 100x faster on a local program than you can on a web-hosted program. And instead of MCP, you can just give your agent a bash terminal - to either make raw API calls, or better yet write CLIs on the fly that make raw API calls.
+
+For consumer applications, the auth problem still remains (although apparently auth predated MCP as a concept, so there might be other ways of addressing it). And we'll definitely probably swing the pendulum more towards cloud-hosted VM tooling as the product categories mature, as ease-of-use trumps rapid product iteration. But for now, bash is all you need.

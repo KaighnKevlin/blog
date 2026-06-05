@@ -4,47 +4,79 @@ description: "A weekend project that became an excuse to learn housing economics
 pubDate: "Apr 07 2026"
 ---
 
-import StoneGearyCliff from '../../components/StoneGearyCliff.astro';
-import LandCapture from '../../components/LandCapture.astro';
-import EndowmentLockIn from '../../components/EndowmentLockIn.astro';
 import ScenarioExplorer from '../../components/ScenarioExplorer.astro';
 import NYCHousingTimeline from '../../components/NYCHousingTimeline.astro';
+import FARExplorer from '../../components/FARExplorer.astro';
+import Glossary from '../../components/Glossary.astro';
 
-I spent a couple days (and Claude spent ~20 sessions) building [YIMBY NYC](/yimby/) — a simulation where 10,000 "agents" of varied incomes bid on NYC apartments, move to minimize commute, have kids and look for places with more space, lose jobs, double up with friends, sometimes leave the city when they can't take it anymore.
+I spent a couple days vibin' this NYC housing simulation: [YIMBY NYC](/yimby/). 10,000 individual actors of varied incomes bid on NYC apartments, move to minimize commute, have kids and look for places with more space, lose jobs, double up with friends, sometimes leave the city when they can't take it anymore.
 
 Go to [kaighn.com/yimby](/yimby/) and hit play to advance month by month from 2020 to 2070. Toggle policies in the left nav — remove parking minimums, upzone the Bronx, levy a land value tax, mandate 100% affordable housing on every new project, abolish CEQR — and watch what happens.
 
-## A note on confidence before we start
+## How It Works
 
-This is a one-person project that ran for a few days. Where I am on the methodology spectrum, [borrowing](https://en.wikipedia.org/wiki/Spectrum_(disambiguation)) Alejandro's framing from a friend chat:
+The simulator opens in January 2020 with 10,000 households scattered across 55 NYC neighborhoods. Each agent is a person with an income, household size, age, work location, savings, and a tolerance for commute. Each month — each "tick" — they ask the same question: *am I in the right place?*
 
-> 1. I have no idea what my AIs did.
-> 2. I (+ AIs) did roughly X to establish methodology. I tentatively stand behind the qualitative directions. **I would be embarrassed if someone found an obvious invalidating bug.** ← I'm here.
-> 3. Methods adhere to canonical sources, reviewed by people who weren't me.
+Some shop around. Some renew. New arrivals come, retirees leave. Available units go up for auction: interested renters make bids, someone wins, and they move in! Developers run a "pro forma" each month and decide whether to break ground on making a new building - potentially financing it depending on the current interest rates.
 
-So: **don't take the magnitudes literally.** Don't cite this in housing-policy debates. The model is a thinking aid, not an oracle. Where I have reasonable confidence is in qualitative *ordinal* claims — "X is worse than Y", "policies that share property Z perform worse than ones without it." The cardinal numbers (e.g. "2.8 million units built") are made up by an engine I wrote in a few days.
+### Try the policy nav
 
-What I want to share is what I *learned by building it*, not what the simulator "proved." The construction process itself was the education — committing causal beliefs to code forces you to face which ones contradict.
+This is the simulator running inline, minus the map. Toggle policies on the left, hit play in the top bar, watch the trend charts at the bottom. For the full thing with neighborhood maps and detail panels, open [the standalone simulator](/yimby/).
 
-## How the thing works (briefly)
+<div style="position: relative; left: 50%; transform: translateX(-50%); width: min(820px, 96vw); margin: 1.5rem 0;">
+  <iframe
+    src="/yimby/index.html?embed=1"
+    title="YIMBY NYC mini simulator"
+    loading="lazy"
+    style="width: 100%; height: 720px; border: 1px solid #334155; border-radius: 12px; background: #0f172a; display: block;"
+  ></iframe>
+</div>
 
-The simulator opens in January 2020 with 10,000 households scattered across 55 NYC neighborhoods. Each is an agent with an income, household size, age, work location, savings, and a tolerance for commute. Each month — each "tick" — they ask the same question: *am I in the right place?*
+## NYC Housing History
 
-Some shop around. Some renew. New arrivals come, retirees leave. Available units go up for auction: market-rate clears at the marginal-bid price; rent-stabilized units get screened by income with noise (which causes "Yuppie Fishbowl" — wealthy tenants capturing cheap regulated apartments). Developers run a pro forma each month and decide whether to break ground.
-
-The mechanism that drove most of the model's interesting behavior is the Stone-Geary "subsistence cliff":
-
-<StoneGearyCliff />
-
-Drag the income slider down. Notice the discontinuity. Below the cliff, the agent doesn't merely shrug and accept a worse deal — the unit is *infeasible*. They cannot live there because food, transit, and utilities aren't substitutable for housing. They search elsewhere, or they flee. This is why low-income flight in housing crises looks like a regime change, not a gradual response curve.
-
-A handful of other mechanisms matter a lot for results (I'll defend these below): the endowment effect locking in rent-stabilized tenants, land cost capitalization eating upzoning windfalls, search friction (you only see a few units a month), and the auction mechanic itself. These are the load-bearing pieces. The model has a lot of other features (gentrification, blight, demolition, capital flight, life events) which add color but don't drive the headline policy ordering.
-
-Before continuing, one piece of context: every policy in 2020 NYC is a reaction to the unintended consequences of the previous one. The simulator's in-game history tab walks through 180 years of this. It's relevant because the simulator can't pretend 2020 is a blank slate — it has to start with the layered policy state we actually inherited:
+The simulator's in-game history tab walks through 180 years of NYC housing events, legislation, and history. Every policy in 2020 NYC is a reaction to the unintended consequences of the previous one — the simulator can't pretend 2020 is a blank slate.
 
 <NYCHousingTimeline />
 
-## What I learned
+## What I Learned
+
+### FAR (Floor Area Ratio)
+
+The hidden number that rules our life in NYC, and no one talks about it. Here's how it works:
+
+With a FAR of 1 — if you have a 1,000 sq ft lot, you can build one story. Or 2 stories on 500 sq ft, leaving the other half of the lot empty. Or 4 stories on 25% of the lot.
+
+The number determines whether a neighborhood is a forest of towers (Midtown, FAR 10) or detached suburban homes (Staten Island R1, FAR 0.5). It's the single biggest dial in housing policy, and the average New Yorker has never heard the term.
+
+<FARExplorer />
+
+Two things that surprised me building this:
+
+**Most of NYC is zoned closer to Bayside than Midtown.** Roughly three-quarters of residential land in the city is R1–R5: single- and two-family homes. The dense city you picture from movies is a small slice of the actual zoning map. Even Williamsburg required a 2005 upzone to get to its current ~FAR 2.4, and it's still less than a quarter of Midtown's allowance.
+
+**Residential is capped at FAR 12 by state law** (the Multiple Dwelling Law). R10, the densest as-of-right residential district, sits at 10.0 — set in 1961 and barely moved since. Every residential supertall in Manhattan got there through air-rights transfers, special bonuses, or sliver-tower geometry tricks — not because zoning lets you build big. The Brooklyn Tower, Steinway Tower, 432 Park: all worked around the cap, not within it.
+
+**Commercial zoning is a different story.** The 2017 Midtown East rezone pushed FAR to 18 on Lexington/Madison/Third, 21.6 on Park Avenue around Grand Central, and 24 in the blocks immediately adjacent to it. Hudson Yards was up-zoned to 18 base with peaks at 24. NYC happily lets offices reach FAR 24; it draws the line at apartments past 12.
+
+In the simulator, the "upzone-all" scenario extends FAR 10 citywide — i.e. lets 50 neighborhoods do what 5 currently can. That's already a much bigger move than New York has been willing to make.
+
+### The Pro Forma (The Developer's Spreadsheet)
+
+Every month, the simulation runs a "pro forma" — a math equation checking if a new building will be profitable.
+
+It estimates rent revenue, subtracts running costs, and compares that potential profit against construction costs, land prices, and loan interest. It's a harsh binary. When the Fed raises interest rates, loans get expensive, and projects die.
+
+The most consequential real-world example: **421-a.** Until it expired in June 2022, the tax abatement was the difference between rental construction penciling out or not in NYC. Without it, the pro forma turned negative for most rental projects even at 2022's record-high rents. New multifamily rental starts dropped roughly 80% the following year. The math has to work or nobody builds — even in the middle of a housing crisis.
+
+Same logic applies to interest rates. When the Fed went from ~0% to 5.5% in 2022–2023, projects that had been profitable on paper for years suddenly weren't. The pipeline didn't slowly empty — it snapped. This is *[real options theory](https://en.wikipedia.org/wiki/Real_options_valuation)*: when the future gets volatile, the value of waiting goes up. Developers don't have to choose to build; they can just wait, and they often do.
+
+### Moving Chains
+
+Build more? How will building more luxury apartment buildings for yuppies do anything other than gentrify our historic neighborhoods?
+
+In the simulation, when a new building opens, high-income tenants move in. But they leave their old apartments vacant. Middle-income tenants move into those, leaving theirs vacant. This creates a **moving chain** (economists call this "filtering"). One new luxury unit can shake loose 4–5 moves down the chain, ending in a unit that becomes affordable to someone who otherwise wouldn't have had one.
+
+But watch what happens when you don't build that luxury tower. The chain breaks. The high-income newcomers still arrive — they're not going away because you didn't build — but now they compete for existing, older housing, outbidding lower-income residents. Noah Smith calls this the **"Yuppie Fishbowl"** effect: luxury towers act as fishtanks that safely absorb high-income demand. Without the fishbowl, the yuppies are loose in the ecosystem, eating everything.
 
 ### I came in as YIMBY. I left as YIMBY+vouchers.
 
@@ -54,11 +86,7 @@ The simulator agrees with this *partially*. The best-performing scenario in my d
 
 What genuinely updated my view was running Section 8 vouchers. I expected modest individual benefit and significant market distortion. What I observed in the model was the opposite: voucher recipients exit homelessness, stay in the city, reach stable rent burdens — and the side-effect (a small demand-side rent inflation in voucher-accepting neighborhoods) is much smaller than I'd assumed. Roughly 0.5% rent inflation per placement, against a huge anti-homelessness benefit.
 
-Then compare to rent control:
-
-<EndowmentLockIn />
-
-Universal rent control in the simulator is *catastrophic*. The endowment effect locks tenants into apartments that no longer fit them (empty-nesters keep 3BRs, families squeeze into studios). Construction collapses because the cap rate inversion kills profitability. Most of the city flees. The remaining tenants are technically rent-protected but the city as a functioning entity is gone.
+Then compare to rent control. Universal rent control in the simulator is *catastrophic*. It creates "golden handcuffs" locking tenants into apartments that no longer fit them (empty-nesters keep 3BRs, families squeeze into studios) because giving up a below-market deal feels like an irrational loss. Construction collapses because the cap rate inversion kills profitability. Most of the city flees. The remaining tenants are technically rent-protected but the city as a functioning entity is gone.
 
 The contrast struck me: vouchers and RC are both demand-side interventions aimed at the same problem (low-income tenants can't afford market rents). But vouchers *route around* the price signal while RC *breaks* it. Routing around is much better.
 
@@ -66,13 +94,25 @@ I then read more — Edward Glaeser, Rebecca Diamond, Joe Gyourko, the Moving to
 
 So my current position is something like: **strong supply-side reform, with a land value tax to prevent landowner capture, with vouchers as the demand-side complement**. Rent control narrow and means-tested if at all. This is more "left-YIMBY" or "abundance-with-redistribution" than my original pure-supply position.
 
-### The supply side is real but partially captured
+### The Illusion of "Low Rent" (Lost Human Potential)
 
-<LandCapture />
+When you toggle on 100% universal rent control, the "Average Rent" metric on the dashboard looks amazing. But the simulation forced me to code a new metric to capture reality: **Waitlist Suffering.**
+
+This tracks the total months people spend desperately searching for housing. Under rent control, waitlist suffering skyrockets. The rent is legally "low," but nobody can actually *get* an apartment because the vacancy rate drops to zero.
+
+The economic term for this destroyed human potential is **[Deadweight Loss](https://en.wikipedia.org/wiki/Deadweight_loss)**. It measures the value lost when people who want to live, work, and contribute to the city are locked out. In the code, it's a brutal calculation: counting up all the people forced into shelters or out of the city, and multiplying that by the wages they would have earned. Low rents don't matter if you're stuck in a shelter or forced to leave your home entirely.
+
+### You can't just upzone everywhere (Infrastructure Strain)
+
+It's tempting to play God and just upzone the entire city to solve the crisis instantly. But real infrastructure — subways, sewers, electrical grids — was sized for original neighborhood densities.
+
+I had to code in an **Infrastructure Strain** penalty. If a neighborhood's population doubles beyond its original capacity, the model applies compounding costs: terrible commutes from subway overcrowding, and a 15% added cost for developers who now have to upgrade water mains and dig deeper foundations. It proved to me that you can't just dump infinite density on one single neighborhood; you have to spread the new housing citywide.
+
+### The supply side is real but partially captured
 
 The thing the YIMBY discourse mostly skips: when zoning lets you build twice as much on a lot, the lot becomes worth roughly twice as much. In my model, landowners capture ~75% of the marginal value from upzoning. Developers absorb most of the rest as higher land acquisition costs. Renters see small reductions, slowly.
 
-The fix isn't to oppose upzoning — it's to upzone *and* tax the windfall. Toggle the LVT checkbox above; the distribution shifts dramatically. Without LVT, YIMBY is partly a transfer to current landowners. With LVT, the surplus flows to renters and the public.
+The fix isn't to oppose upzoning — it's to upzone *and* tax the windfall. A land value tax (LVT) shifts the distribution dramatically. Without LVT, YIMBY is partly a transfer to current landowners. With LVT, the surplus flows to renters and the public.
 
 I think this is the biggest unforced error in the current YIMBY movement: fighting for upzoning without fighting for the tax that captures its gains.
 
@@ -98,7 +138,7 @@ The flip side: pure rent control and 100% mandatory affordable mandates are cata
 
 The mechanisms I treat as load-bearing are all well-established in housing/urban economics:
 
-- **[Stone-Geary utility](https://en.wikipedia.org/wiki/Stone%E2%80%93Geary_utility_function)** with subsistence floor — this is the cliff
+- **[Stone-Geary utility](https://en.wikipedia.org/wiki/Stone%E2%80%93Geary_utility_function)** with subsistence floor — the "rent eats first" cliff
 - **[Diamond-Mortensen-Pissarides](https://en.wikipedia.org/wiki/Search_and_matching_theory_(economics))** search friction (2010 Nobel) — agents see ~5 units/month, not the full market
 - **[Alonso-Muth-Mills](https://en.wikipedia.org/wiki/Bid_rent_theory)** bid-rent for the commute-vs-rent tradeoff
 - **[Rosen-Roback spatial equilibrium](https://en.wikipedia.org/wiki/Rosen%E2%80%93Roback_model)** for departure to other metros
@@ -110,8 +150,18 @@ The implementations are documented in [SIMULATION.md](https://github.com/KaighnK
 
 The things I'd want a real housing economist to check before I'd raise my confidence one notch: the parameter calibration (most numbers are eyeballed, not estimated), the labor-capacity constraint shape, and whether the auction mechanic accurately models how NYC rent-stabilized units actually get allocated. If you're that economist and you want to break this, the source is at [github.com/KaighnKevlin/yimby](https://github.com/KaighnKevlin/yimby).
 
+## Glossary
+
+Every term I'd never heard before starting this — plus NYC specifics and source links. Search or click any term to expand.
+
+<Glossary />
+
 ## Try it. Disagree with it. Tell me what's wrong.
 
 The simulator is at [kaighn.com/yimby](/yimby/). Hit play, toggle some policies, watch the city evolve. The grading system maps three sub-scores to a 0-100 composite — but honestly the letter grades are arbitrary and you should ignore them in favor of the underlying metrics (rent in 2025$, households housed, units built, fraction fled).
 
 The thing I'm most confident in after this whole exercise is the smallest possible claim: **housing is a multi-equation problem.** No single policy fixes it. The honest answer to "what should we do" is *most of them, in the right order, sustained for 30+ years*. Which is to say: we should start.
+
+## Disclaimer
+
+This is a vibe coded housing simulator. We're not simulating every atom in the universe — we're just codifying some simple rules into code and seeing if there's any emergent properties. So: **don't take the magnitudes literally.** Don't cite this in housing-policy debates. Just treat this as a way to interact with a political opinion essay in a video game rather than reading a dry urban econ PhD thesis.

@@ -1,0 +1,216 @@
+---
+// Hands-on permutation builder. Pick N items and R slots, then click tiles to
+// fill the slots in order. Every distinct ordering you complete gets recorded;
+// a counter tracks how many of the n-P-r arrangements you've discovered.
+---
+
+<div class="pl-widget rounded-xl border border-gray-200 p-6 my-8 bg-white">
+  <div class="flex items-baseline justify-between mb-1">
+    <h3 class="text-lg font-semibold">Permutation lab</h3>
+    <span class="text-[10px] text-gray-400 uppercase tracking-wider font-mono">click to place</span>
+  </div>
+  <p class="text-sm text-gray-600 mb-4">Click tiles to fill the slots left-to-right. Each finished ordering is recorded below. How many can you find?</p>
+
+  <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mb-5 text-sm">
+    <label class="flex items-center gap-2">
+      <span class="font-medium">Items (n)</span>
+      <select id="pl-n" class="border border-gray-300 rounded px-2 py-1 font-mono bg-white">
+        <option>3</option><option selected>4</option><option>5</option>
+      </select>
+    </label>
+    <label class="flex items-center gap-2">
+      <span class="font-medium">Slots to fill (r)</span>
+      <select id="pl-r" class="border border-gray-300 rounded px-2 py-1 font-mono bg-white"></select>
+    </label>
+    <button id="pl-reset" class="ml-auto text-xs px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50">Reset progress</button>
+  </div>
+
+  <!-- Slots -->
+  <div class="flex flex-wrap items-center gap-2 mb-4" id="pl-slots"></div>
+
+  <!-- Available tiles -->
+  <div class="flex flex-wrap gap-2 mb-5" id="pl-tiles"></div>
+
+  <!-- Progress -->
+  <div class="bg-gray-50 rounded-lg p-3 mb-4">
+    <div class="flex items-center justify-between text-sm mb-2">
+      <span>Arrangements found</span>
+      <span class="font-mono"><span id="pl-found" class="font-bold text-gray-900">0</span> / <span id="pl-total">24</span></span>
+    </div>
+    <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+      <div id="pl-bar" class="h-full bg-violet-500 rounded-full transition-all duration-300" style="width:0%"></div>
+    </div>
+    <div class="text-xs text-gray-500 mt-2 font-mono" id="pl-formula"></div>
+  </div>
+
+  <!-- Discovered gallery -->
+  <div id="pl-gallery" class="flex flex-wrap gap-1.5"></div>
+</div>
+
+<script>
+  type Tile = { id: number; label: string; color: string };
+
+  const PALETTE = [
+    { color: '#8b5cf6', label: 'A' },
+    { color: '#10b981', label: 'B' },
+    { color: '#f59e0b', label: 'C' },
+    { color: '#ef4444', label: 'D' },
+    { color: '#0ea5e9', label: 'E' },
+  ];
+
+  const nSel = document.getElementById('pl-n') as HTMLSelectElement;
+  const rSel = document.getElementById('pl-r') as HTMLSelectElement;
+  const slotsEl = document.getElementById('pl-slots')!;
+  const tilesEl = document.getElementById('pl-tiles')!;
+  const galleryEl = document.getElementById('pl-gallery')!;
+  const foundEl = document.getElementById('pl-found')!;
+  const totalEl = document.getElementById('pl-total')!;
+  const barEl = document.getElementById('pl-bar')!;
+  const formulaEl = document.getElementById('pl-formula')!;
+  const resetBtn = document.getElementById('pl-reset')!;
+
+  let n = 4;
+  let r = 4;
+  let tiles: Tile[] = [];
+  let placed: Tile[] = []; // current in-progress arrangement
+  let found = new Set<string>();
+
+  function factorial(x: number): number {
+    let acc = 1;
+    for (let i = 2; i <= x; i++) acc *= i;
+    return acc;
+  }
+  function nPr(n: number, r: number): number {
+    return factorial(n) / factorial(n - r);
+  }
+
+  function rebuild() {
+    n = parseInt(nSel.value, 10);
+    // Repopulate r options (1..n), keeping a sensible default.
+    const prevR = r;
+    rSel.innerHTML = '';
+    for (let i = 1; i <= n; i++) {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = String(i);
+      rSel.appendChild(opt);
+    }
+    r = Math.min(prevR, n);
+    rSel.value = String(r);
+
+    tiles = PALETTE.slice(0, n).map((p, i) => ({ id: i, ...p }));
+    placed = [];
+    found = new Set();
+    render();
+  }
+
+  function setR() {
+    r = parseInt(rSel.value, 10);
+    placed = [];
+    found = new Set();
+    render();
+  }
+
+  function tileChip(t: Tile, opts: { size?: 'sm' | 'lg'; faded?: boolean } = {}) {
+    const span = document.createElement('span');
+    const dim = opts.size === 'lg' ? 'w-11 h-11 text-lg' : 'w-7 h-7 text-xs';
+    span.className = `inline-flex items-center justify-center ${dim} rounded-lg font-bold text-white select-none ${opts.faded ? 'opacity-25' : ''}`;
+    span.style.backgroundColor = t.color;
+    span.textContent = t.label;
+    return span;
+  }
+
+  function place(t: Tile) {
+    if (placed.find((p) => p.id === t.id)) return; // already used
+    if (placed.length >= r) return;
+    placed.push(t);
+    if (placed.length === r) {
+      const key = placed.map((p) => p.id).join('-');
+      const isNew = !found.has(key);
+      if (isNew) found.add(key);
+      renderGalleryAdd(placed.slice(), isNew);
+      // brief pause so the completed row is visible, then clear
+      const snapshot = placed.slice();
+      placed = [];
+      renderSlots(snapshot, true);
+      setTimeout(() => { renderSlots(); }, 650);
+      renderTiles();
+      renderProgress();
+      return;
+    }
+    render();
+  }
+
+  function renderSlots(highlight?: Tile[], flash = false) {
+    slotsEl.innerHTML = '';
+    const show = highlight ?? placed;
+    for (let i = 0; i < r; i++) {
+      const slot = document.createElement('div');
+      slot.className = `flex items-center justify-center w-12 h-12 rounded-lg border-2 ${flash ? 'border-violet-400 bg-violet-50' : 'border-dashed border-gray-300'}`;
+      if (show[i]) {
+        slot.classList.remove('border-dashed');
+        slot.appendChild(tileChip(show[i], { size: 'lg' }));
+      } else {
+        slot.innerHTML = `<span class="text-gray-300 font-mono text-sm">${i + 1}</span>`;
+      }
+      slotsEl.appendChild(slot);
+    }
+  }
+
+  function renderTiles() {
+    tilesEl.innerHTML = '';
+    tiles.forEach((t) => {
+      const used = !!placed.find((p) => p.id === t.id);
+      const btn = document.createElement('button');
+      btn.className = `inline-flex items-center justify-center w-11 h-11 rounded-lg font-bold text-lg text-white transition-transform ${used ? 'opacity-25 cursor-default' : 'hover:scale-110 active:scale-95 cursor-pointer'}`;
+      btn.style.backgroundColor = t.color;
+      btn.textContent = t.label;
+      btn.disabled = used;
+      btn.onclick = () => place(t);
+      tilesEl.appendChild(btn);
+    });
+  }
+
+  function renderProgress() {
+    const total = nPr(n, r);
+    foundEl.textContent = String(found.size);
+    totalEl.textContent = String(total);
+    barEl.style.width = `${(found.size / total) * 100}%`;
+    const fnTop = factorial(n).toLocaleString();
+    formulaEl.innerHTML =
+      r === n
+        ? `${n}P${n} = ${n}! = ${total.toLocaleString()} orderings`
+        : `${n}P${r} = ${n}! / (${n}−${r})! = ${fnTop} / ${factorial(n - r).toLocaleString()} = ${total.toLocaleString()}`;
+  }
+
+  function renderGalleryAdd(arr: Tile[], isNew: boolean) {
+    if (!isNew) {
+      // flash a "seen it" toast by briefly outlining nothing; keep it simple:
+      return;
+    }
+    const card = document.createElement('div');
+    card.className = 'flex gap-0.5 p-1 rounded-md bg-gray-50 border border-gray-200';
+    arr.forEach((t) => card.appendChild(tileChip(t)));
+    card.style.opacity = '0';
+    card.style.transform = 'scale(0.6)';
+    card.style.transition = 'opacity .25s, transform .25s';
+    galleryEl.appendChild(card);
+    requestAnimationFrame(() => {
+      card.style.opacity = '1';
+      card.style.transform = 'scale(1)';
+    });
+  }
+
+  function render() {
+    renderSlots();
+    renderTiles();
+    renderProgress();
+    galleryEl.innerHTML = '';
+  }
+
+  nSel.addEventListener('change', rebuild);
+  rSel.addEventListener('change', setR);
+  resetBtn.addEventListener('click', () => { placed = []; found = new Set(); render(); });
+
+  rebuild();
+</script>

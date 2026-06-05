@@ -1,0 +1,442 @@
+---
+// Full housing/zoning glossary ported from the simulator's in-game Glossary tab.
+// 67 entries with search + click-to-expand for detailed + NYC notes + links.
+---
+
+<div class="glossary-widget bg-slate-900 text-slate-300 rounded-xl p-6 my-8 border border-slate-700 text-[13px] leading-relaxed">
+  <div class="flex items-baseline justify-between mb-3">
+    <h3 class="text-base font-semibold text-white">Housing glossary</h3>
+    <span class="text-[10px] text-slate-500 uppercase tracking-wider font-mono">From the simulator</span>
+  </div>
+  <p class="text-slate-400 mb-3 text-[12px]">67 housing-economics terms with NYC specifics. Click a term to expand for full context, history, and links.</p>
+
+  <div class="relative mb-3">
+    <input
+      type="text"
+      id="glossary-search"
+      placeholder="Search terms, NYC details, links…"
+      class="w-full bg-slate-800 border border-slate-700 rounded-md text-slate-100 placeholder-slate-500 px-3 py-2 text-[12px] focus:outline-none focus:border-cyan-500"
+    />
+    <span id="glossary-count" class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-mono"></span>
+  </div>
+
+  <div id="glossary-list" class="max-h-[520px] overflow-y-auto pr-2 -mr-2 space-y-2"></div>
+</div>
+
+<script>
+  interface Entry {
+    id: string;
+    term: string;
+    short: string;
+    detailed: string;
+    nyc?: string;
+    links?: { label: string; url: string }[];
+  }
+
+  const GLOSSARY: Entry[] = [
+    { id: 'far', term: 'FAR (Floor Area Ratio)',
+      short: 'The ratio of a building\'s total floor area to its lot size. FAR 2.0 = 2 sq ft of building per 1 sq ft of lot.',
+      detailed: 'Floor Area Ratio is the fundamental zoning control determining how much can be built on a given parcel. A 10,000 sq ft lot with FAR 6.0 can have up to 60,000 sq ft of floor area — which might be a 6-story building covering the whole lot, or a 12-story building covering half. FAR is the single most important constraint on housing supply: when FAR is low, no amount of demand can produce more housing.',
+      nyc: 'NYC zoning districts: R1-R5 (FAR 0.5-1.25, single-family/townhouses, Staten Island/eastern Queens), R6-R7 (FAR 2.0-4.0, walk-ups, much of Brooklyn/Bronx), R8-R10 (FAR 6.0-12.0, towers, Manhattan/Downtown Brooklyn). Commercial C6-9 allows up to FAR 18.0. NYC uniquely uses "contextual" zoning that imposes height limits in addition to FAR, preventing developers from using all their FAR rights.',
+      links: [
+        { label: 'NYC Zoning Resolution', url: 'https://zr.planning.nyc.gov/' },
+        { label: 'NYC Zoning & Land Use Map (ZoLA)', url: 'https://zola.planning.nyc.gov/' },
+      ] },
+    { id: 'pro-forma', term: 'Pro Forma',
+      short: 'A financial projection developers use to determine whether a building is economically viable.',
+      detailed: 'A developer\'s pro forma projects costs (land acquisition, hard construction costs, soft costs, financing) against revenues (rental income) to determine whether returns exceed the hurdle rate. The key output is Residual Land Value — what the developer can afford to pay for land. If the pro forma "doesn\'t pencil," the project doesn\'t get built, regardless of how much housing is needed.',
+      nyc: 'Typical NYC development costs: Hard costs $300-700+/sq ft (wood-frame ~$300, mid-rise ~$450, high-rise ~$600+). Soft costs 15-25% of hard costs. Land $50-1,000+/buildable sq ft. Prevailing wage adds 20-30% for subsidized projects. Timeline: 3-6 years from acquisition to stabilization. NYC has among the highest construction costs in the world due to strong unions, complex regulation (CEQR, ULURP, DOB), and limited site access.' },
+    { id: 'rent-control', term: 'Rent Stabilization / Rent Control',
+      short: 'NYC regulation limiting annual rent increases for ~1 million apartments, with increases set by the Rent Guidelines Board.',
+      detailed: 'Rent stabilization applies to buildings with 6+ units built 1947-1974 plus newer buildings with tax benefits. Tenants have strong renewal rights and cannot be evicted except for cause. Landlords can increase rents through Major Capital Improvements (MCIs) and Individual Apartment Improvements (IAIs), which have been repeatedly reformed and restricted.',
+      nyc: 'Approximately 1 million of NYC\'s 2.1 million rental apartments are rent-stabilized. The RGB (9 members: 2 tenant reps, 2 owner reps, 5 public) sets rates annually — 2.75% for 1-year leases in 2024-25. The 2019 HSTPA eliminated vacancy decontrol, the 20% vacancy bonus, and capped IAIs at $15,000 over 15 years. 291,000 apartments were permanently deregulated between 1994-2019 before the loophole closed. Legacy rent control (pre-1947 buildings, tenants since 1971) covers only ~22,000 remaining units.',
+      links: [
+        { label: 'NYC Rent Guidelines Board', url: 'https://rentguidelinesboard.cityofnewyork.us/' },
+        { label: 'HSTPA (2019 Law)', url: 'https://en.wikipedia.org/wiki/Housing_Stability_and_Tenant_Protection_Act_of_2019' },
+        { label: 'Diamond et al. (2019) — Effects of Rent Control', url: 'https://web.stanford.edu/~diamondr/DMQ.pdf' },
+      ] },
+    { id: 'coyho', term: 'COYHO (City of Yes for Housing Opportunity)',
+      short: 'NYC\'s landmark 2024 zoning reform enabling 82,000+ new homes through ADUs, parking reform, and TOD.',
+      detailed: 'Passed December 5, 2024, the most significant citywide zoning change since 1961. A package of supply-side reforms estimated to enable 82,000+ new homes over 15 years.',
+      nyc: 'Key provisions: Parking reform (three-zone system — nearly eliminated in Manhattan/LIC, reduced in outer transit areas, retained in car-dependent zones). ADU legalization (Local Laws 126-127, DOB accepting applications Sept 2025). TOD (R3-R5 within 0.5mi of transit, ~23,000 lots, R1-R2 excluded). Town center zoning (2-4 stories above shops). UAP (20% FAR bonus in R6+ for affordable units). $5 billion in city/state funding. Proposed by Adams administration, championed by DCP Director Dan Garodnick. Faced fierce suburban opposition; passed in modified form with some district exemptions.',
+      links: [
+        { label: 'NYC DCP — City of Yes', url: 'https://www.nyc.gov/site/planning/plans/city-of-yes/city-of-yes-housing-opportunity.page' },
+        { label: 'Manhattan Institute Analysis', url: 'https://manhattan.institute/article/city-of-successful-housing-reform-with-vote-nyc-takes-first-step-toward-pro-housing-zoning' },
+      ] },
+    { id: 'adu', term: 'ADU (Accessory Dwelling Unit)',
+      short: 'A secondary housing unit on the same lot as a primary residence — basement apartments, attic conversions, or backyard cottages.',
+      detailed: 'Homeowners can add backyard cottages, basement apartments, or attic conversions. Adds gentle density without changing neighborhood character. Typically 800 sq ft or less.',
+      nyc: 'Legalized as part of COYHO via Local Laws 126 and 127. DOB began accepting applications September 30, 2025. Permitted in 1- and 2-family homes. Ground-floor and basement ADUs prohibited in flood zones (post-Hurricane Ida, which killed 11 in basement apartments in 2021). Only ~12% of the city\'s 1-2 family properties qualify under Council restrictions. Projected to add ~25,000 units over 15 years. Mayor Adams launched "ADU For You" homeowner assistance program.' },
+    { id: 'tod', term: 'TOD (Transit-Oriented Development)',
+      short: 'Dense, mixed-use development concentrated near transit stations — putting housing where infrastructure exists.',
+      detailed: 'A land use strategy that concentrates dense, mixed-use development within walking distance of transit stations. Puts housing where infrastructure already exists, reducing car dependency.',
+      nyc: 'Under COYHO, low-density sites (R3-R5) within half a mile of transit can build 3-5 story apartment buildings. ~23,000 lots affected. Sites must be 5,000+ sq ft on wide streets. Projects of 50+ units must provide 20% affordable at 80% AMI. R1-R2 districts were excluded by the Council. NYC has historically failed to implement TOD despite having the nation\'s largest transit system — much low-density zoning persists near subway stations.' },
+    { id: 'lvt', term: 'Land Value Tax (LVT)',
+      short: 'A tax on the unimproved value of land only, incentivizing development and discouraging empty lots.',
+      detailed: 'Proposed by Henry George in Progress and Poverty (1879). Unlike property tax (which penalizes building), LVT only taxes land value, so building more adds zero tax. A landowner sitting on an empty lot pays the same tax as the owner of a 50-story tower on identical adjacent land. Economists from Adam Smith to Milton Friedman endorsed it as the "least bad tax" because land supply is fixed — taxing it creates zero deadweight loss.',
+      nyc: 'NYC does not currently use a pure LVT. George nearly won the 1886 NYC mayoral race on this platform. NYC\'s current property tax is arguably the opposite of LVT: Class 2 (rental apartments) assessed at ~45% of income value, penalizing building. Pittsburgh and several PA cities use split-rate taxes that tax land more heavily than improvements. In the simulation, LVT (0-50%) accelerates development on underbuilt parcels and pressures holdout landowners to sell.',
+      links: [
+        { label: 'Henry George — Wikipedia', url: 'https://en.wikipedia.org/wiki/Henry_George' },
+        { label: 'Progress and Poverty (1879)', url: 'https://en.wikipedia.org/wiki/Progress_and_Poverty' },
+        { label: 'Land Value Tax — Wikipedia', url: 'https://en.wikipedia.org/wiki/Land_value_tax' },
+      ] },
+    { id: 'state-preemption', term: 'State Preemption (Builder\'s Remedy)',
+      short: 'State government overrides local zoning restrictions to allow housing development, bypassing NIMBY opposition.',
+      detailed: 'State-level laws that override local zoning restrictions to compel housing production. California\'s SB 35 and Massachusetts Chapter 40B are the most prominent examples — cities failing housing targets lose the ability to block qualifying projects.',
+      nyc: 'New York State doesn\'t currently have a builder\'s remedy. Governor Hochul\'s 2023 "Housing Compact" proposal included one but failed in the legislature due to suburban opposition. In the simulation, state preemption is the most powerful single policy: reduces construction from 36 to 24 months, eliminates community board vetoes, bypasses CEQR delays, and overrides local zoning restrictions.',
+      links: [
+        { label: 'California SB 35', url: 'https://en.wikipedia.org/wiki/California_Senate_Bill_35_(2017)' },
+        { label: 'Massachusetts Chapter 40B', url: 'https://en.wikipedia.org/wiki/Massachusetts_Comprehensive_Permit_Act:_Chapter_40B' },
+        { label: 'Builder\'s Remedy — YIMBY Law', url: 'https://www.yimbylaw.org/buildersremedy' },
+      ] },
+    { id: 'parking-minimums', term: 'Parking Minimums',
+      short: 'Zoning rules forcing developers to build parking spaces per unit, adding $50-150k per space to construction costs.',
+      detailed: 'Parking minimums were introduced in the 1950s as part of auto-centric planning. They require developers to build structured or underground parking regardless of demand. In dense transit-rich cities, this is economically perverse: the parking costs more than the car it houses, and the space could have been additional apartments. Research by Donald Shoup (UCLA) showed parking minimums are the most destructive zoning regulation for housing affordability.',
+      nyc: 'Before COYHO, most NYC residential districts required 0.5-1.0 spaces per unit, even in Manhattan where car ownership is under 25%. A structured parking space costs $100,000-$150,000 in Manhattan. For a 100-unit building at 0.5 spaces/unit, that\'s $5-7.5 million passed to renters. COYHO\'s three-zone system: Zone 1 (Manhattan core) nearly eliminated, Zone 2 (outer transit areas) reduced, Zone 3 (car-dependent) largely retained.',
+      links: [
+        { label: 'Donald Shoup — The High Cost of Free Parking', url: 'https://en.wikipedia.org/wiki/The_High_Cost_of_Free_Parking' },
+      ] },
+    { id: 'town-center', term: 'Town Center Zoning',
+      short: 'Allows apartments above shops on commercial corridors, creating walkable neighborhoods without rezoning residential streets.',
+      detailed: 'Part of COYHO, town center zoning permits 2-4 stories of housing above commercial ground floors in low-density areas. This is how most cities worldwide naturally developed before auto-centric zoning separated uses in the mid-20th century.',
+      nyc: 'Allows mixed-use development on commercial corridors throughout the city — apartments above bodegas, restaurants, and shops. Creates walkable neighborhoods without requiring controversial residential rezonings.' },
+    { id: 'uap', term: 'UAP (Universal Affordability Preference)',
+      short: 'A COYHO program giving developers a 20% FAR bonus in exchange for including permanently affordable units.',
+      detailed: 'Available in R6+ districts. Unlike MIH (which is mandatory in rezoned areas), UAP is voluntary — developers opt in to get more density. This increases total housing supply while guaranteeing some affordable units, avoiding the viability problems of pure mandates.',
+      nyc: 'Part of COYHO. Developers receive a 20% FAR bonus (e.g., FAR 4.0 becomes FAR 4.8) in exchange for permanently affordable units. Available citywide in medium-to-high density districts. Designed to produce housing at all income levels without requiring neighborhood-specific rezonings.' },
+    { id: 'affordable-mandate', term: 'Affordable Mandate (MIH)',
+      short: 'Requiring developers to include a percentage of below-market-rate units in new buildings.',
+      detailed: 'Requiring developers to include a percentage of below-market-rate units in new buildings. The higher the mandate, the fewer projects are financially viable — the simulation\'s 50% mandate dramatically reduces construction because the affordable units can\'t cross-subsidize the building\'s costs.',
+      nyc: 'NYC\'s Mandatory Inclusionary Housing (adopted 2016) requires 25-30% permanently affordable units in rezoned areas. Options: 25% at 60% AMI (~$76,260 for family of 4), 30% at 80% AMI, 20% at 40% AMI, or 30% at 115% AMI (workforce). AMI for NYC metro: ~$127,100 for family of 4 (2024). Triggered only when City Council approves a rezoning — the political quid pro quo for increased density.',
+      links: [
+        { label: 'NYC DCP — MIH Program', url: 'https://www.nyc.gov/site/planning/plans/mih/mandatory-inclusionary-housing.page' },
+        { label: 'Manhattan Institute — What\'s Wrong with MIH', url: 'https://manhattan.institute/article/de-blasios-mandatory-inclusionary-housing-program-what-is-wrong-and-how-it-can-be-made-right' },
+      ] },
+    { id: 'cap-rate', term: 'Cap Rate (Capitalization Rate)',
+      short: 'A property\'s annual income divided by its value. A 5% cap rate means $500k/yr income on a $10M building.',
+      detailed: 'Cap rate = NOI / Property Value. It\'s the real estate equivalent of an earnings yield. Lower cap rates = higher property values = lower perceived risk. Cap rates are directly linked to interest rates: when the Fed raises rates, cap rates rise, property values fall, and fewer projects pencil out.',
+      nyc: 'NYC multifamily cap rates: Manhattan luxury 3.5-4.5%, Manhattan stabilized 4.0-5.5%, Brooklyn/Queens market-rate 4.5-5.5%, outer borough stabilized 5.5-7.0%, Bronx/distressed 7.0-10.0%. The 2019 HSTPA caused stabilized building values to fall 15-40% as investors repriced regulatory risk (+100-200bps overnight). In the simulation, RC coverage adds up to 500bps regulatory risk premium.',
+      links: [
+        { label: 'Cap Rates Explained — JP Morgan', url: 'https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/cap-rates-explained' },
+      ] },
+    { id: 'noi', term: 'NOI (Net Operating Income)',
+      short: 'A property\'s rental income minus operating expenses, before debt payments. The fundamental measure of building performance.',
+      detailed: 'NOI = Gross Rent - Vacancy Loss - Operating Expenses (taxes, insurance, maintenance, management). Does NOT include mortgage payments — making it a financing-neutral metric for comparing properties. When NOI turns negative, the building is a financial liability and the landlord must inject capital or defer maintenance.',
+      nyc: 'Typical NYC operating expenses: $8,000-25,000/unit/year, with property taxes the largest single expense (30-40% of OpEx). The RGB\'s annual Income & Expense study tracks operating costs to inform rent-setting. Persistent negative NOI triggers the blight/decay pathway in the simulation, reflecting real NYC dynamics where underfunded stabilized buildings deteriorate.' },
+    { id: 'gpr', term: 'GPR (Gross Potential Revenue)',
+      short: 'The total rental income a property would earn if every unit were occupied at current asking rents.',
+      detailed: 'GPR represents the theoretical maximum revenue. Actual revenue is lower due to vacancy, collection losses, and concessions. GPR = Total Units × Average Rent × 12 months. In the simulation, GPR is shown in each neighborhood\'s pro forma section.' },
+    { id: 'opex', term: 'OpEx (Operating Expenses)',
+      short: 'The costs of running a building — property tax, insurance, utilities, maintenance, and management fees.',
+      detailed: 'In NYC, OpEx typically runs $8,000-25,000 per unit per year. Property taxes are the single largest expense, often 30-40% of total OpEx. The RGB\'s annual Income & Expense study tracks these costs to inform rent increase decisions.' },
+    { id: 'vacancy-rate', term: 'Vacancy Rate',
+      short: 'The percentage of housing units that are empty and available. NYC\'s rate is ~1.4% — dangerously low.',
+      detailed: 'A healthy vacancy rate is 5-7%, allowing mobility and choice. NYC\'s ~1.4% rate (2023 Housing Vacancy Survey) means near-zero slack in the market, forcing bidding wars and displacement. Below 5%, the market is considered in a "housing emergency" under NYC law, which is what triggers rent regulation authority.' },
+    { id: 'building-age', term: 'Building Age',
+      short: 'How old a building is, affecting quality, maintenance costs, and the CapEx cliff at ~40 years.',
+      detailed: 'Building age drives physical depreciation (older = lower utility), operating costs (older = higher maintenance), and the CapEx cliff — at ~40 years, boilers, roofs, elevators, and facades all need replacement ($50,000/unit). For rent-stabilized buildings with capped rents, this CapEx can be unfundable, leading to blight.' },
+    { id: 'homeless', term: 'Homelessness',
+      short: 'When agents can\'t find housing after extended searching. In the simulation, 18+ months unhoused triggers street homelessness.',
+      detailed: 'The simulation models a "homelessness cliff" — after 18 months of unsuccessful searching, agents become street homeless, imposing amenity penalties on the neighborhood (safety concerns, reduced retail vitality). NYC has ~90,000 people in the shelter system (2024), the largest homeless population of any US city.',
+      links: [
+        { label: 'Coalition for the Homeless — NYC Data', url: 'https://www.coalitionforthehomeless.org/basic-facts-about-homelessness-new-york-city/' },
+      ] },
+    { id: 'commute', term: 'Commute Time',
+      short: 'Travel time to work, which directly reduces disposable income and housing utility in the Alonso-Muth-Mills model.',
+      detailed: 'The simulation uses a polycentric Alonso-Muth-Mills model: each agent\'s commute cost is the minimum of commuting to three CBDs — Midtown, FiDi (Financial District), or Downtown Brooklyn. Low-transit neighborhoods impose an additional $500/month car cost penalty. Average NYC commute: 43 minutes one-way (longest of any US city).',
+      links: [
+        { label: 'Alonso-Muth-Mills Model — Wikipedia', url: 'https://en.wikipedia.org/wiki/Bid_rent_theory' },
+        { label: 'William Alonso — Location and Land Use', url: 'https://en.wikipedia.org/wiki/William_Alonso' },
+      ] },
+    { id: 'down-filtering', term: 'Vacancy Chains & the Yuppie Fishbowl',
+      short: 'When new housing is built, people move in and leave their old unit — creating a chain of moves that frees up cheaper housing down the line.',
+      detailed: 'A vacancy chain starts when a new building opens: a high-income tenant moves in, leaving their old apartment vacant. A middle-income tenant moves into that vacancy, leaving theirs. The chain continues until a low-income household moves into a better unit. Research by Mast (2021) found each 100 new market-rate units triggers moves that free up 45-70 units in below-median-income neighborhoods. When new housing ISN\'T built, the chain breaks — high-income newcomers instead compete for existing older housing, outbidding lower-income residents. Noah Smith calls this the "Yuppie Fishbowl" effect: luxury towers act as fishtanks that absorb high-income demand, preventing displacement.',
+      links: [
+        { label: 'Noah Smith — Yuppie Fishtanks', url: 'https://www.noahpinion.blog/p/yuppie-fishtanks-yimbyism-explained' },
+        { label: 'Mast (2021) — Vacancy Chains', url: 'https://research.upjohn.org/up_workingpapers/307/' },
+        { label: 'Autor, Palmer & Pathak (2014) — Housing Market Spillovers', url: 'https://www.nber.org/papers/w18125' },
+      ] },
+    { id: 'rent-burden', term: 'Rent Burden',
+      short: 'The percentage of income spent on rent. Over 30% = "rent-burdened." Over 50% = "severely burdened."',
+      detailed: 'The 30% threshold comes from the 1969 Brooke Amendment (originally 25%). In NYC, over 50% of renter households are rent-burdened and ~30% are severely burdened. The simulation uses Stone-Geary utility where the effective budget ratio rises from 30% to 50% as desperation increases.',
+      links: [
+        { label: 'Brooke Amendment — Wikipedia', url: 'https://en.wikipedia.org/wiki/Brooke_Amendment' },
+        { label: 'Stone-Geary Utility — Wikipedia', url: 'https://en.wikipedia.org/wiki/Stone%E2%80%93Geary_utility_function' },
+      ] },
+    { id: 'units-built', term: 'Units Built',
+      short: 'Cumulative housing units delivered by developers.',
+      detailed: 'The simulation tracks every unit from pro forma → construction start → delivery (36 months, or 24 with state preemption). Units are only counted as "built" when construction completes and they become available for occupancy.' },
+    { id: 'units-decayed', term: 'Units Decayed',
+      short: 'Housing units lost to blight, disrepair, or abandonment when landlords can\'t afford maintenance.',
+      detailed: 'When a building\'s NOI is negative for extended periods, landlords defer maintenance, triggering the blight pathway. Blighted buildings lose units and impose amenity penalties. The Bronx in the 1970s lost over 300,000 units to abandonment and arson — the most dramatic example of housing decay in US history.' },
+    { id: 'waitlist', term: 'Waitlist Suffering',
+      short: 'Total agent-months spent searching for housing — a measure of cumulative misery from housing scarcity.',
+      detailed: 'Each month an agent spends searching is one unit of "waitlist suffering." 1,000 agents searching for 12 months = 12,000 agent-months. This metric captures the human cost of housing shortages even when headline numbers (rent, homeless count) look acceptable.' },
+    { id: 'warehoused', term: 'Warehoused Units',
+      short: 'Apartments deliberately held empty by landlords who can\'t profit under current regulations.',
+      detailed: 'After the 2019 HSTPA eliminated vacancy decontrol and capped improvements, many landlords chose to keep stabilized units vacant rather than rent at a loss. Vacant stabilized units peaked at 61,000+ in 2021. The 2023 Housing Vacancy Survey found 26,310 stabilized apartments "vacant but unavailable for rent." The simulation models warehoused units that re-enter supply during "regulatory thaw" when YIMBY policies pass.',
+      links: [
+        { label: 'THE CITY — 60,000 Stabilized Apartments Vacant', url: 'https://www.thecity.nyc/2022/10/19/60000-rent-stabilized-apartments-vacant-warehousing-nyc-landlords-housing/' },
+      ] },
+    { id: 'historic-district', term: 'Historic District',
+      short: 'A designated area where the Landmarks Preservation Commission must approve any exterior changes, freezing density.',
+      detailed: 'NYC has ~150 historic districts protecting ~40,000 buildings. LPC review effectively prevents demolition and rebuilding at higher density. Research by NYU Furman Center found historic designation reduces new housing production by 80-90%. In the simulation, historic patches have FAR penalties and higher community veto probability.',
+      links: [
+        { label: 'NYC Landmarks Preservation Commission', url: 'https://www.nyc.gov/site/lpc/index.page' },
+        { label: 'Historic Districts — Wikipedia', url: 'https://en.wikipedia.org/wiki/Historic_districts_in_the_United_States' },
+      ] },
+    { id: 'blight', term: 'Blight',
+      short: 'Building deterioration from deferred maintenance when landlords can\'t afford repairs.',
+      detailed: 'Blight is triggered when NOI is persistently negative. Blighted buildings reduce neighborhood amenity scores (safety, retail vitality, property values), creating a negative spiral. The CapEx cliff at ~40 years is the primary blight trigger — $50k/unit in capital needs that stabilized rents can\'t fund.' },
+    { id: 'construction', term: 'Under Construction',
+      short: 'Housing units currently being built. Construction takes 36 months normally, 24 with state preemption.',
+      detailed: 'The simulation models a full construction pipeline: developer pro forma → community review → groundbreaking → 36-month build → unit delivery. Construction labor capacity is limited (2,000 units/month citywide), creating backpressure when many projects start simultaneously.' },
+    { id: 'rc-coverage', term: 'RC Coverage (Rent Control %)',
+      short: 'The fraction of a neighborhood\'s units under rent stabilization. Higher coverage = more regulatory risk for developers.',
+      detailed: 'RC coverage ranges from 0% (no regulation) to 100% (universal rent control). In the simulation, each percentage point of coverage adds to the regulatory risk premium on cap rates: at 50% coverage, developers face +250bps (2.5%) higher required returns, killing many pro formas.' },
+    { id: 'transit-access', term: 'Transit Accessibility',
+      short: 'A 0-1 score measuring proximity to subway and bus service. Higher score = lower commute costs.',
+      detailed: 'Ranges from 1.0 (Midtown — multiple subway lines within 5-minute walk) to 0.0 (car-dependent outer areas). Transit accessibility directly affects housing utility through the Alonso-Muth-Mills commute cost model. Low-transit neighborhoods impose an additional car ownership cost of ~$500/month.' },
+    { id: 'land-cost', term: 'Land Cost',
+      short: 'The per-unit acquisition cost for buildable land — the biggest variable in development economics.',
+      detailed: 'NYC land costs range from $50/buildable sq ft (South Bronx) to $1,000+/buildable sq ft (Midtown Manhattan). When FAR increases through upzoning, land values rise because more units can be built — the "zoning tax." Landowners capture ~40% of the upzoning value gain, with developers retaining the rest.' },
+    { id: 'approval', term: 'Approval Rating',
+      short: 'The player\'s political approval score, based on housing outcomes. Drop below 30% and you\'re voted out.',
+      detailed: 'The simulation models political dynamics: housed residents prefer stability (resist change), while homeless and rent-burdened populations demand action. Policies that disrupt neighborhoods lower approval from incumbents, while policies that improve affordability raise it. Below 30% triggers a "game over" — voted out of office.' },
+    { id: 'budget', term: 'Municipal Budget',
+      short: 'The city\'s fiscal balance from tax revenue minus spending on services.',
+      detailed: 'The simulation tracks tax revenue from property taxes and LVT, minus 97% spent on city services (reflecting that cities don\'t save surplus). Municipal construction draws directly from the budget. Higher LVT rates increase revenue but may deter some investment.' },
+    { id: 'display-scale', term: 'Display Scale',
+      short: 'The multiplier (350x) converting 10,000 simulated agents to ~3.5 million real households.',
+      detailed: 'Running 3.5 million agents would be computationally infeasible. The simulation uses 10,000 agents at 350x scale. All numbers shown to players (housed, homeless, units) are multiplied by 350. The underlying economics operate on the 10,000-agent model.' },
+    { id: 'equity', term: 'Equity (Housing)',
+      short: 'How fairly housing outcomes are distributed across income levels, especially for low-income households.',
+      detailed: 'The results screen grades equity based on the percentage of low-income households that are housed. High equity (>80% housed) means the housing system is working for everyone. Low equity (<30%) means the poorest are locked out — a crisis.' },
+    { id: 'affordability', term: 'Affordability',
+      short: 'Whether rents are within reach of the population, measured by real (inflation-adjusted) rent levels.',
+      detailed: 'The simulation deflates all rents to real 2025 dollars (dividing by (1.025)^years) to strip out inflation. Real rent below $2,000/month is rated "A" for affordability; above $5,000 is "F." This captures the actual purchasing-power impact on residents.' },
+    { id: 'office-conversion', term: 'Office-to-Residential Conversion',
+      short: 'Converting empty commercial office buildings into housing — accelerated by post-COVID remote work vacancies.',
+      detailed: 'NYC has millions of square feet of vacant or underutilized office space, particularly older Class B/C buildings in Midtown and the Financial District. Converting these to apartments avoids the cost of land acquisition and demolition. Challenges include floor plate depth (offices are often too deep for residential), plumbing/HVAC retrofit costs, and zoning restrictions.',
+      nyc: 'NYC enacted office conversion incentives in 2024 as part of broader housing policy. The Adams administration targeted older pre-1990 buildings for conversion. Manhattan office vacancy reached ~20% post-COVID. A single converted building can produce 200-500 apartments without any new construction footprint.' },
+    { id: 'lot-splits', term: 'Lot Splits / Flag Lots',
+      short: 'Allowing homeowners to subdivide their lots and sell portions to small developers for infill housing.',
+      detailed: 'In low-density neighborhoods (R1-R3), many lots are larger than needed for a single home. Lot split legalization lets owners carve off backyard or side-yard portions for small-scale development — typically 2-4 unit buildings. This breaks the monopoly of large lot requirements and creates a supply of small, pre-assembled parcels that don\'t require expensive assemblage.' },
+    { id: 'sro', term: 'SRO (Single Room Occupancy)',
+      short: 'Micro-unit buildings (~150 sq ft rooms) with shared kitchens and bathrooms, targeting low-income individuals.',
+      detailed: 'SROs were once a vital part of NYC\'s affordable housing ecosystem — cheap rooms for single workers, immigrants, and seniors. NYC had ~200,000 SRO units in 1955. Anti-SRO zoning, urban renewal, and the 1955 SRO conversion law destroyed most of them — by 1995, fewer than 50,000 remained. Re-legalizing SROs enables construction at ~60% of normal per-unit cost due to smaller footprint and shared facilities. In the simulation, SRO legalization reduces hard costs for developers building in neighborhoods with rents below $2,500/mo.' },
+    { id: 'shot-clock', term: 'Permit Shot Clock',
+      short: 'A deadline requiring the Department of Buildings to approve or deny a building permit within 60 days — or it\'s automatically approved.',
+      detailed: 'Permit delays are one of the largest hidden costs in development. Every month of delay means carrying costs on the land acquisition loan, lost rent revenue, and increased construction cost inflation. A shot clock eliminates delay uncertainty entirely, letting developers budget precisely and reducing the risk premium in their pro forma. Similar to "default-to-yes" permitting in other jurisdictions.' },
+    { id: 'single-staircase', term: 'Single Staircase Reform',
+      short: 'Legalizing single-stair buildings up to 6 stories, as is standard in Europe and Asia — saving ~15% of floor area.',
+      detailed: 'NYC currently requires two staircases for almost all multi-story buildings. The second staircase consumes 15-20% of each floor plate, forcing developers to build long, narrow "double-loaded corridor" buildings instead of efficient point-access blocks. Single-stair reform would allow more livable apartment layouts (cross-ventilation, wider units) while reducing construction cost per unit.',
+      links: [
+        { label: 'Single-stair reform movement', url: 'https://en.wikipedia.org/wiki/Single-stair_building' },
+      ] },
+    { id: 'mass-timber', term: 'Mass Timber Construction',
+      short: 'Using engineered wood (CLT/glulam) instead of steel and concrete for mid-rise buildings — 15% cheaper and faster to build.',
+      detailed: 'Cross-Laminated Timber (CLT) panels are prefabricated in factories and assembled on-site like Lego blocks. Benefits: 30-50% faster construction than concrete, lower carbon footprint, lighter weight (smaller foundations), and competitive cost. Requires updated building codes to allow taller timber buildings — many cities now permit 12-18 story mass timber.',
+      links: [
+        { label: 'Cross-laminated timber — Wikipedia', url: 'https://en.wikipedia.org/wiki/Cross-laminated_timber' },
+      ] },
+    { id: 'pre-approved-plans', term: 'Pre-Approved Building Catalog',
+      short: 'City-published pre-designed, pre-approved blueprints for small buildings and ADUs — dramatically cutting soft costs.',
+      detailed: 'Instead of hiring expensive architects, engineers, and expediters for every project, developers can pick from a catalog of pre-approved designs. Soft costs (normally 10-20% of hard costs) drop to ~2% because the design is already approved. Los Angeles pioneered this for ADUs, reducing approval time from months to days. Most effective for small projects (≤20 units).' },
+    { id: 'ceqr-exemption', term: 'CEQR Exemption',
+      short: 'Exempting housing projects from NYC\'s environmental review process, which NIMBYs weaponize to delay or kill developments.',
+      detailed: 'CEQR (City Environmental Quality Review) was designed to assess environmental impacts, but in practice it\'s often used as a litigation tool to block housing. A shadow study, traffic analysis, or "secondary displacement" claim can add 1-2 years and $1-5M in costs. Exempting infill housing from CEQR eliminates this delay, the associated carrying costs, and the Real Options volatility penalty that makes developers wait instead of building.' },
+    { id: 'prevailing-wage', term: 'Prevailing Wage',
+      short: 'Government-mandated union-scale wages for construction workers on subsidized projects, adding 20-30% to labor costs.',
+      detailed: 'The Wicks Law and prevailing wage requirements apply to publicly subsidized construction in New York, requiring contractors to pay union-scale wages regardless of whether the workers are unionized. This adds 20-30% to labor costs, making subsidized affordable housing more expensive per unit than market-rate housing. Repeal would allow the same municipal budget to produce significantly more public housing units.',
+      nyc: 'NYC\'s 485-x tax abatement requires prevailing wages for projects over a certain size. The requirement was a political compromise between unions and developers. Critics argue it makes affordable housing unaffordable to build; supporters argue it protects construction worker livelihoods.' },
+    { id: 'section-8', term: 'Section 8 / Housing Choice Vouchers',
+      short: 'Federal rental assistance where the government pays the gap between 30% of a tenant\'s income and the market rent.',
+      detailed: 'The most targeted demand-side housing policy: voucher holders choose their own apartment, and the government pays the landlord the difference between 30% of the household\'s income and the fair market rent. Unlike rent control (which distorts supply), vouchers subsidize demand without reducing construction incentives.',
+      nyc: 'NYCHA administers ~85,000 Section 8 vouchers. The waitlist reopened June 2024 with 633,808 applicants for ~200,000 lottery slots. Voucher value: HUD Fair Market Rent for a 2BR in NYC is ~$2,387/month. NYC prohibits source-of-income discrimination (landlords can\'t refuse voucher holders).',
+      links: [
+        { label: 'Section 8 — Wikipedia', url: 'https://en.wikipedia.org/wiki/Section_8_(housing)' },
+      ] },
+    { id: 'good-cause-eviction', term: 'Good Cause Eviction',
+      short: 'A 2024 NY state law requiring landlords to have a valid reason to refuse lease renewals, with rent increase caps.',
+      detailed: 'Landlords cannot evict or refuse to renew without "good cause" (nonpayment, nuisance, owner occupancy). Rent increases above CPI + 5% (max 10%) are presumptively unreasonable. Protects incumbent tenants but suppresses churn, reducing housing availability for newcomers — the simulation shows newcomer utility drops 25% under Good Cause.',
+      nyc: 'Signed April 20, 2024. Applies automatically in NYC; other municipalities opt in. Exempts buildings built after 2009 and units above 245% of Fair Market Rent (~$6,004 for 1BR). 17 municipalities had opted in by early 2025.' },
+    { id: 'vacancy-decontrol', term: 'Vacancy Decontrol',
+      short: 'The former practice of permanently removing rent regulation from apartments when the rent exceeded a threshold and the tenant left — eliminated in 2019.',
+      detailed: 'From 1997 to 2019, when a rent-stabilized apartment\'s legal rent exceeded ~$2,774/month AND the apartment became vacant, it was permanently deregulated. Landlords could push rents above this threshold through vacancy bonuses (a 20% rent increase allowed upon turnover) and IAI surcharges. This created incentives for tenant harassment — pressuring long-term tenants to leave so the unit could be deregulated.',
+      nyc: 'At least 291,000 apartments were permanently deregulated through vacancy decontrol between 1994-2019. The 2019 HSTPA abolished ALL forms of vacancy decontrol, vacancy bonuses, and high-rent deregulation. Apartments already deregulated remain so — the law is prospective only.',
+      links: [
+        { label: 'HSTPA (2019)', url: 'https://en.wikipedia.org/wiki/Housing_Stability_and_Tenant_Protection_Act_of_2019' },
+      ] },
+    { id: 'iai', term: 'IAI (Individual Apartment Improvement)',
+      short: 'A rent increase landlords can charge after renovating a vacant stabilized apartment — now capped at $15,000 over 15 years.',
+      detailed: 'When a rent-stabilized tenant moves out, the landlord can renovate the unit and add a permanent rent surcharge to recoup the cost. Before 2019, there was no cap on IAI spending, so landlords could do $50,000+ renovations to push the legal rent above the vacancy decontrol threshold. The 2019 HSTPA capped IAIs at $15,000 over a rolling 15-year period, dramatically reducing the incentive to renovate vacant stabilized units — which critics say contributes to warehousing.',
+      nyc: 'IAIs were a primary mechanism for the "renovation-to-decontrol pipeline" that removed ~291,000 units from stabilization between 1994-2019. The $15,000 cap translates to roughly $89/month in additional rent — often insufficient to justify a full gut renovation, which is why many landlords now warehouse units instead.' },
+    { id: 'mci', term: 'MCI (Major Capital Improvement)',
+      short: 'A rent surcharge passed to all tenants in a building when the landlord makes a major improvement like a new roof, boiler, or elevator.',
+      detailed: 'Unlike IAIs (which affect individual apartments), MCIs affect the entire building. The landlord files with HCR, proves the improvement was necessary, and is allowed to spread the cost across all tenants as a permanent monthly surcharge. The 2019 HSTPA capped MCI increases at 2% of a tenant\'s rent per year.',
+      nyc: 'The RGB\'s annual rent increase includes an estimated 0.5%/year for MCI passthroughs on top of the base increase. Common MCIs: new boilers ($200-400k), elevator modernization ($100-300k), facade restoration ($150-500k), window replacement ($100-300k). Pre-2019, landlords could pass through 6% of the cost annually; post-HSTPA, limited to 2%.' },
+    { id: 'vacancy-bonus', term: 'Vacancy Bonus',
+      short: 'The 20% rent increase landlords could charge when a stabilized tenant moved out — eliminated by the 2019 HSTPA.',
+      detailed: 'Before 2019, every time a rent-stabilized apartment turned over, the landlord could automatically increase the legal rent by 20% (or more for long tenancies). Combined with IAI surcharges, this was the mechanism that pushed rents above the vacancy decontrol threshold. The 2019 HSTPA eliminated vacancy bonuses entirely — the rent a new tenant pays is the same legal rent the previous tenant paid, plus only the RGB-approved increase.' },
+    { id: 'jane-jacobs', term: 'Jane Jacobs',
+      short: 'Author and activist whose 1961 book "The Death and Life of Great American Cities" championed dense, mixed-use, walkable neighborhoods — and fought Robert Moses\'s highway plans.',
+      detailed: 'Jane Jacobs (1916-2006) argued that the top-down urban renewal of the 1950s — demolishing "slum" neighborhoods to build towers-in-parks and highways — destroyed the organic vitality that made cities work. She championed short blocks, mixed uses, old buildings, and high density. Her fight to stop Robert Moses from building an expressway through Greenwich Village and SoHo became the most famous battle in American urbanism.',
+      nyc: 'Jacobs lived at 555 Hudson Street in the West Village. Her activism saved Greenwich Village, SoHo, and Little Italy from demolition. She\'s a complex figure for housing policy: modern NIMBYs cite her "preservation" arguments to block new construction, while YIMBYs cite her love of density and mixed-use. The YIMBY movement argues Jacobs would support building more housing in the neighborhoods she loved — she opposed highways and towers-in-parks, not density itself. Her intellectual legacy is claimed by both sides of the housing debate.',
+      links: [
+        { label: 'Jane Jacobs — Wikipedia', url: 'https://en.wikipedia.org/wiki/Jane_Jacobs' },
+        { label: 'The Death and Life of Great American Cities', url: 'https://en.wikipedia.org/wiki/The_Death_and_Life_of_Great_American_Cities' },
+      ] },
+    { id: 'robert-moses', term: 'Robert Moses',
+      short: 'NYC\'s master builder who shaped the city from the 1930s-60s, building highways, bridges, parks, and public housing — while demolishing neighborhoods and displacing 250,000+ people.',
+      detailed: 'Robert Moses (1888-1981) held simultaneous positions controlling parks, highways, bridges, tunnels, and public housing across NYC and New York State for over 30 years. He built 13 bridges, 416 miles of parkways, 658 playgrounds, and vast public housing complexes. He also demolished entire neighborhoods — displacing over 250,000 people, disproportionately Black and Puerto Rican — to build the Cross-Bronx Expressway, the BQE, and massive urban renewal projects. His "slum clearance" approach replaced mixed-use neighborhoods with isolated housing towers surrounded by empty plazas.',
+      nyc: 'Moses\'s legacy is deeply embedded in NYC\'s landscape: Lincoln Center, the UN headquarters, Jones Beach, the Triborough Bridge, the Cross-Bronx Expressway. The Cross-Bronx alone destroyed 60,000 homes and split the South Bronx in half, contributing to the borough\'s devastating decline in the 1970s. His approach — centralized power, top-down planning, contempt for existing communities — provoked the backlash that created NYC\'s current community review process (ULURP). The irony: ULURP was designed to prevent another Moses, but it now empowers NIMBYs to block the housing construction that communities desperately need. NYC\'s 1961 Zoning Resolution, which established the FAR system used in this simulation, was adopted during Moses\'s era.',
+      links: [
+        { label: 'Robert Moses — Wikipedia', url: 'https://en.wikipedia.org/wiki/Robert_Moses' },
+        { label: 'The Power Broker (Robert Caro)', url: 'https://en.wikipedia.org/wiki/The_Power_Broker' },
+        { label: 'Cross-Bronx Expressway', url: 'https://en.wikipedia.org/wiki/Cross-Bronx_Expressway' },
+      ] },
+    { id: 'welfare', term: 'Total Welfare (Utilitarian)',
+      short: 'The sum of every agent\'s utility — a single number measuring overall societal well-being.',
+      detailed: 'Utilitarian welfare sums every household\'s utility: housed agents get positive utility (based on how well their housing matches their needs), unhoused agents get negative utility (worsening with time searching), and fled agents permanently subtract their suffering. Higher is better. A policy that helps many people a little can score higher than one that helps a few people a lot.',
+      nyc: 'The simulation computes utility using a Stone-Geary function that considers rent affordability (with $800/month subsistence floor), commute cost (Alonso-Muth-Mills polycentric model), building quality (age depreciation), space mismatch (bedrooms vs. household size), and neighborhood amenities.',
+      links: [
+        { label: 'Social Welfare Function — Wikipedia', url: 'https://en.wikipedia.org/wiki/Social_welfare_function' },
+        { label: 'Utilitarianism — Wikipedia', url: 'https://en.wikipedia.org/wiki/Utilitarianism' },
+      ] },
+    { id: 'rawlsian', term: 'Rawlsian Floor (Bottom 5%)',
+      short: 'The utility of the worst-off 5% of households — measuring how the most vulnerable are doing.',
+      detailed: 'Named after philosopher John Rawls, who argued that a just society should maximize the welfare of its worst-off members (the "maximin" principle). The Rawlsian floor is the 5th percentile utility — the experience of the bottom 5% of households. A high Rawlsian score means even the poorest people have decent housing. A negative score means the bottom 5% are homeless or severely housing-burdened.',
+      nyc: 'In NYC, the bottom 5% of households are typically those earning under $25,000/year — food service workers, home health aides, cashiers. Their housing options depend entirely on whether policies produce enough affordable units. Rent control may protect *current* low-income tenants but does nothing for new arrivals or those displaced by gentrification.',
+      links: [
+        { label: 'John Rawls — Wikipedia', url: 'https://en.wikipedia.org/wiki/John_Rawls' },
+        { label: 'A Theory of Justice', url: 'https://en.wikipedia.org/wiki/A_Theory_of_Justice' },
+      ] },
+    { id: 'utility-gini', term: 'Utility Gini (Inequality)',
+      short: 'How unequally utility is distributed across households. 0 = perfect equality, 1 = total inequality.',
+      detailed: 'The Gini coefficient applied to housing utility rather than income. A city where everyone has roughly equal housing satisfaction scores near 0. A city where some people live in luxury while others are homeless scores near 1. This captures the distributional dimension that total welfare misses — a high-welfare city could still be deeply unequal.',
+      links: [
+        { label: 'Gini Coefficient — Wikipedia', url: 'https://en.wikipedia.org/wiki/Gini_coefficient' },
+      ] },
+    { id: 'deadweight-loss', term: 'Deadweight Loss (DWL)',
+      short: 'Economic value destroyed when housing policy prevents people from living where they\'d be most productive — measured in billions of dollars.',
+      detailed: 'Deadweight loss measures the cost of misallocation: households that would have contributed to NYC\'s economy but couldn\'t access housing. Calculated as: (unhoused + fled agents) × average income × 12 months × 0.5. The 0.5 factor is the Harberger triangle approximation — the average lost surplus between the marginal excluded household and the market-clearing price. Lower DWL is better; zero means everyone who wants to live in NYC can.',
+      nyc: 'Hsieh and Moretti (2019) estimated that housing constraints in NYC, San Francisco, and San Jose reduced US GDP by 36% — $2 trillion per year in deadweight loss from workers unable to move to the most productive cities. In the simulation, DWL is a primary scoring metric reflecting this insight.',
+      links: [
+        { label: 'Deadweight Loss — Wikipedia', url: 'https://en.wikipedia.org/wiki/Deadweight_loss' },
+        { label: 'Harberger Triangle', url: 'https://en.wikipedia.org/wiki/Harberger%27s_triangle' },
+        { label: 'Hsieh & Moretti (2019) — Housing Constraints and Spatial Misallocation', url: 'https://www.aeaweb.org/articles?id=10.1257/mac.11.2.1' },
+      ] },
+    { id: 'interest-rate', term: 'Interest Rate (Fed)',
+      short: 'The player-controlled federal funds rate. Higher rates raise cap rates, kill pro formas, and slow construction.',
+      detailed: 'The interest rate slider (0-10%) lets you simulate Fed policy. Higher rates directly increase cap rates — raising the return developers need to justify a project. At 0%, the sim uses its default cap rate model. At 7%+, almost no new construction pencils out. This mirrors 2022-23, when Fed rate hikes froze US housing starts.' },
+    { id: 'means-tested-rc', term: 'Means-Tested Rent Control',
+      short: 'Rent control applied only to neighborhoods with below-median rents, targeting regulation where tenants are most vulnerable.',
+      detailed: 'Standard rent control applies uniformly. Means-tested RC restricts regulation to below-median-rent neighborhoods, sparing high-rent areas where developers are most active. This reduces the regulatory risk premium on new construction while still protecting low-income tenants in affordable neighborhoods.' },
+    { id: 'lihtc', term: 'LIHTC (Low-Income Housing Tax Credit)',
+      short: 'Federal tax credits subsidizing 20-50% of construction costs for projects with >30% affordable units.',
+      detailed: 'Created by the Tax Reform Act of 1986, LIHTC is the primary federal subsidy for affordable housing construction. Developers receive tax credits proportional to the affordable fraction, which they sell to investors to raise equity. In the simulation, projects with >30% affordable fraction receive LIHTC credits (20-50% of hard costs) plus potential HPD land discounts (up to 60%). Without these subsidies, affordable mandates above ~25% kill the developer pro forma.',
+      nyc: 'NYC is the largest LIHTC market in the US. HPD allocates 9% and 4% credits through competitive RFPs. Most deeply affordable NYC projects (below 60% AMI) rely on stacked subsidies: LIHTC + HPD land + city capital funds + tax-exempt bonds.',
+      links: [
+        { label: 'LIHTC — Wikipedia', url: 'https://en.wikipedia.org/wiki/Low-Income_Housing_Tax_Credit' },
+      ] },
+    { id: 'right-to-shelter', term: 'Right to Shelter',
+      short: 'NYC\'s legal mandate to provide shelter to every homeless person, costing $5,000/mo per person from the city budget.',
+      detailed: 'Established by the 1981 Callahan v. Carey consent decree, NYC is the only major US city with a legal right to shelter. Every homeless agent costs SHELTER_COST_PER_HOMELESS_AGENT ($5,000/mo) from the municipal budget. This creates fiscal pressure: policies that increase homelessness drain the budget, leaving less for housing production. "Do nothing" and "100% RC" scenarios face mounting fiscal crises.',
+      nyc: 'NYC\'s shelter system housed ~100,000 people nightly in 2024 at a cost exceeding $4 billion/year. The right to shelter is unique to NYC and creates a direct financial incentive to reduce homelessness through housing production rather than just managing it through shelters.',
+      links: [
+        { label: 'Callahan v. Carey', url: 'https://en.wikipedia.org/wiki/Callahan_v._Carey' },
+      ] },
+    { id: 'endowment-effect', term: 'Endowment Effect',
+      short: 'Behavioral bias where RC tenants overvalue their current unit, refusing to move unless they can afford 1.5x market rent.',
+      detailed: 'Named after Richard Thaler\'s Nobel Prize-winning work on loss aversion. In the simulation, RC tenants apply a 1.5x multiplier (RC_ENDOWMENT_MULTIPLIER) — they won\'t voluntarily leave unless they can afford 1.5x the current market rent in their neighborhood. This goes beyond pure financial calculation: giving up a known below-market deal feels like a disproportionate loss, tightening golden handcuffs beyond rational economics.',
+      links: [
+        { label: 'Endowment Effect — Wikipedia', url: 'https://en.wikipedia.org/wiki/Endowment_effect' },
+      ] },
+    { id: 'observed-quality', term: 'Observed Quality (Akerlof)',
+      short: 'The lagged perception of building quality that tenants use to make housing decisions — converges toward actual condition at 30%/yr.',
+      detailed: 'Based on George Akerlof\'s "Market for Lemons" (1970 Nobel Prize). Patches have observed_quality that lags behind actual building condition. A landlord who stops maintenance still looks fine for a year or two — the rot is hidden behind fresh paint. Renovations boost observed_quality by 0.15. This information asymmetry creates a delay before blighted neighborhoods lose demand.',
+      links: [
+        { label: 'The Market for Lemons — Wikipedia', url: 'https://en.wikipedia.org/wiki/The_Market_for_Lemons' },
+      ] },
+    { id: 'infrastructure-strain', term: 'Infrastructure Strain',
+      short: 'Compounding costs when neighborhoods grow beyond 2x original capacity: +30% commute cost and +15% hard cost per doubling.',
+      detailed: 'Prevents costless infinite upzoning. Real infrastructure (subway capacity, water mains, sewers, electrical grid) was sized for original neighborhood density. Growing beyond that requires expensive upgrades. In the simulation, both the utility function (+30% commute cost per doubling) and developer pro forma (+15% hard cost surcharge per doubling) apply penalties above 2x original capacity.' },
+    { id: 'housing-budget', term: 'Housing Budget Share',
+      short: 'The percentage of municipal revenue allocated to housing — adjustable from 3% (NYC default) to 25% (Vienna model).',
+      detailed: 'At 3%, the city builds almost nothing — consistent with NYC\'s actual housing budget. At 25%, the city becomes a major housing producer comparable to Vienna\'s social housing model, but at the cost of other services (schools, police, transit). The slider lets players explore the tradeoff between housing production and other public goods.' },
+    { id: 'spatial-equilibrium', term: 'Spatial Equilibrium (Rosen-Roback)',
+      short: 'The economic model where workers leave cities whose utility falls below the national average — "I could buy a house in Austin for what I pay here."',
+      detailed: 'Sherwin Rosen (1979) and Jennifer Roback (1982) showed that in equilibrium, the combination of wages, rents, and amenities must equalize across cities. In the simulation, housed agents with utility below 2.0 (national baseline) face a 5% annual departure rate. This creates realistic outmigration pressure when policies fail — the city doesn\'t just get more crowded, it loses productive residents.',
+      links: [
+        { label: 'Roback (1982) — Wages, Rents, and the Quality of Life', url: 'https://en.wikipedia.org/wiki/Spatial_equilibrium' },
+      ] },
+  ];
+
+  const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c));
+
+  const listEl = document.getElementById('glossary-list')!;
+  const searchEl = document.getElementById('glossary-search') as HTMLInputElement;
+  const countEl = document.getElementById('glossary-count')!;
+  const expanded = new Set<string>();
+
+  function render(query: string) {
+    const q = query.trim().toLowerCase();
+    const filtered = !q ? GLOSSARY : GLOSSARY.filter(e =>
+      e.term.toLowerCase().includes(q) ||
+      e.short.toLowerCase().includes(q) ||
+      e.detailed.toLowerCase().includes(q) ||
+      (e.nyc?.toLowerCase().includes(q) ?? false)
+    );
+    countEl.textContent = `${filtered.length} / ${GLOSSARY.length}`;
+
+    listEl.innerHTML = '';
+    if (filtered.length === 0) {
+      listEl.innerHTML = '<div class="text-slate-500 text-center py-8 text-xs italic">No matching terms.</div>';
+      return;
+    }
+
+    filtered.forEach((e) => {
+      const isOpen = expanded.has(e.id);
+      const card = document.createElement('div');
+      card.className = 'rounded-md border border-slate-700 bg-slate-800/50 hover:bg-slate-800 transition-colors';
+
+      const header = document.createElement('button');
+      header.className = 'w-full text-left px-3 py-2 flex items-start gap-2 cursor-pointer';
+      header.innerHTML = `
+        <span class="text-cyan-400 mt-0.5 select-none flex-shrink-0 font-mono text-[10px]">${isOpen ? '▼' : '▶'}</span>
+        <div class="flex-1 min-w-0">
+          <div class="text-[12.5px] font-semibold text-white">${escapeHtml(e.term)}</div>
+          <div class="text-[11.5px] text-slate-400 mt-0.5">${escapeHtml(e.short)}</div>
+        </div>
+      `;
+      header.onclick = () => {
+        if (expanded.has(e.id)) expanded.delete(e.id);
+        else expanded.add(e.id);
+        render(searchEl.value);
+      };
+      card.appendChild(header);
+
+      if (isOpen) {
+        const detail = document.createElement('div');
+        detail.className = 'px-3 pb-3 pt-1 ml-5 space-y-2 text-[11.5px] text-slate-300';
+        let html = `<div>${escapeHtml(e.detailed)}</div>`;
+        if (e.nyc) {
+          html += `<div class="border-l-2 border-amber-500/50 pl-3"><span class="text-[9px] uppercase tracking-wider text-amber-400 font-mono font-bold mb-1 block">NYC</span>${escapeHtml(e.nyc)}</div>`;
+        }
+        if (e.links?.length) {
+          html += `<div class="flex flex-wrap gap-x-3 gap-y-1 pt-1">` +
+            e.links.map(l => `<a href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer" class="text-[10px] text-cyan-400 hover:text-cyan-300 underline decoration-cyan-600/40">${escapeHtml(l.label)} ↗</a>`).join('') +
+            `</div>`;
+        }
+        detail.innerHTML = html;
+        card.appendChild(detail);
+      }
+
+      listEl.appendChild(card);
+    });
+  }
+
+  searchEl.addEventListener('input', () => render(searchEl.value));
+  render('');
+</script>

@@ -1,0 +1,147 @@
+---
+// Side-by-side nPr vs nCr calculator. Two sliders (n, r); shows the falling
+// factorial expansion, the divide-by-r! step, and highlights C(n,r) inside a
+// live Pascal's triangle.
+---
+
+<div class="cc-widget rounded-xl border border-gray-200 p-6 my-8 bg-white">
+  <div class="flex items-baseline justify-between mb-1">
+    <h3 class="text-lg font-semibold">Permutations vs. combinations calculator</h3>
+    <span class="text-[10px] text-gray-400 uppercase tracking-wider font-mono">nPr · nCr</span>
+  </div>
+  <p class="text-sm text-gray-600 mb-4">Choose <span class="font-mono" id="cc-r-label">3</span> of <span class="font-mono" id="cc-n-label">6</span> things.</p>
+
+  <div class="grid sm:grid-cols-2 gap-4 mb-5">
+    <label class="block">
+      <span class="flex items-center justify-between text-sm font-medium mb-1"><span>n — how many to choose from</span><span class="font-mono text-gray-900" id="cc-n-val">6</span></span>
+      <input type="range" min="1" max="12" value="6" id="cc-n" class="w-full accent-gray-800" />
+    </label>
+    <label class="block">
+      <span class="flex items-center justify-between text-sm font-medium mb-1"><span>r — how many you pick</span><span class="font-mono text-gray-900" id="cc-r-val">3</span></span>
+      <input type="range" min="0" max="6" value="3" id="cc-r" class="w-full accent-gray-800" />
+    </label>
+  </div>
+
+  <div class="grid sm:grid-cols-2 gap-3 mb-5">
+    <div class="rounded-lg border border-violet-200 bg-violet-50 p-4">
+      <div class="flex items-baseline justify-between mb-1">
+        <span class="text-sm font-semibold text-violet-800">Permutations <span class="font-mono">nPr</span></span>
+        <span class="text-[10px] uppercase tracking-wide text-violet-500">order matters</span>
+      </div>
+      <div class="font-mono text-2xl font-bold text-violet-900 mb-2" id="cc-npr">120</div>
+      <div class="font-mono text-xs text-violet-700 leading-relaxed" id="cc-npr-work"></div>
+    </div>
+    <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+      <div class="flex items-baseline justify-between mb-1">
+        <span class="text-sm font-semibold text-emerald-800">Combinations <span class="font-mono">nCr</span></span>
+        <span class="text-[10px] uppercase tracking-wide text-emerald-500">order ignored</span>
+      </div>
+      <div class="font-mono text-2xl font-bold text-emerald-900 mb-2" id="cc-ncr">20</div>
+      <div class="font-mono text-xs text-emerald-700 leading-relaxed" id="cc-ncr-work"></div>
+    </div>
+  </div>
+
+  <p class="text-sm text-gray-600 mb-5 bg-gray-50 rounded-lg p-3" id="cc-sentence"></p>
+
+  <details class="text-sm">
+    <summary class="cursor-pointer text-gray-500 hover:text-gray-800 select-none">Show Pascal's triangle — every <span class="font-mono">nCr</span> lives here</summary>
+    <div class="overflow-x-auto mt-3 -mx-2 px-2">
+      <div id="cc-pascal" class="inline-block min-w-full"></div>
+    </div>
+  </details>
+</div>
+
+<script>
+  const nInput = document.getElementById('cc-n') as HTMLInputElement;
+  const rInput = document.getElementById('cc-r') as HTMLInputElement;
+  const nVal = document.getElementById('cc-n-val')!;
+  const rVal = document.getElementById('cc-r-val')!;
+  const nLabel = document.getElementById('cc-n-label')!;
+  const rLabel = document.getElementById('cc-r-label')!;
+  const nprEl = document.getElementById('cc-npr')!;
+  const ncrEl = document.getElementById('cc-ncr')!;
+  const nprWork = document.getElementById('cc-npr-work')!;
+  const ncrWork = document.getElementById('cc-ncr-work')!;
+  const sentence = document.getElementById('cc-sentence')!;
+  const pascalEl = document.getElementById('cc-pascal')!;
+
+  function fact(x: number): number {
+    let a = 1;
+    for (let i = 2; i <= x; i++) a *= i;
+    return a;
+  }
+  function nPr(n: number, r: number): number {
+    let a = 1;
+    for (let i = 0; i < r; i++) a *= n - i;
+    return a;
+  }
+  function nCr(n: number, r: number): number {
+    return nPr(n, r) / fact(r);
+  }
+  const fmt = (x: number) => x.toLocaleString();
+
+  function render() {
+    let n = parseInt(nInput.value, 10);
+    // r can't exceed n; keep the r slider's ceiling synced to n.
+    rInput.max = String(n);
+    let r = Math.min(parseInt(rInput.value, 10), n);
+    rInput.value = String(r);
+
+    nVal.textContent = String(n);
+    rVal.textContent = String(r);
+    nLabel.textContent = String(n);
+    rLabel.textContent = String(r);
+
+    const p = nPr(n, r);
+    const c = nCr(n, r);
+    nprEl.textContent = fmt(p);
+    ncrEl.textContent = fmt(c);
+
+    // Falling-factorial expansion for nPr, e.g. 6 × 5 × 4
+    const factors = Array.from({ length: r }, (_, i) => n - i);
+    nprWork.innerHTML =
+      r === 0
+        ? '= 1 (one way to choose nothing)'
+        : `= ${factors.join(' × ')}<br/>= n! / (n−r)! = ${fmt(fact(n))} / ${fmt(fact(n - r))}`;
+
+    ncrWork.innerHTML =
+      r === 0
+        ? '= 1'
+        : `= nPr / r! = ${fmt(p)} / ${fmt(fact(r))}<br/>= ${fmt(p)} / ${fmt(fact(r))} = ${fmt(c)}`;
+
+    sentence.innerHTML =
+      `Pick ${r} of ${n}. If <strong>order matters</strong> there are <strong class="text-violet-700">${fmt(p)}</strong> ways. ` +
+      `If it <strong>doesn't</strong>, there are only <strong class="text-emerald-700">${fmt(c)}</strong> — because each group of ${r} can be shuffled <span class="font-mono">${r}! = ${fmt(fact(r))}</span> ways, and we counted all of those as the same.`;
+
+    renderPascal(n, r);
+  }
+
+  function renderPascal(activeN: number, activeR: number) {
+    const ROWS = 12;
+    pascalEl.innerHTML = '';
+    for (let row = 0; row <= ROWS; row++) {
+      const tr = document.createElement('div');
+      tr.className = 'flex justify-center gap-1 mb-1';
+      for (let col = 0; col <= row; col++) {
+        const v = nCr(row, col);
+        const cell = document.createElement('span');
+        const isActive = row === activeN && col === activeR;
+        const onRow = row === activeN;
+        cell.className =
+          'inline-flex items-center justify-center rounded text-[10px] font-mono h-6 px-1 min-w-[1.6rem] ' +
+          (isActive
+            ? 'bg-emerald-500 text-white font-bold ring-2 ring-emerald-300'
+            : onRow
+              ? 'bg-emerald-50 text-emerald-700'
+              : 'text-gray-400');
+        cell.textContent = String(v);
+        tr.appendChild(cell);
+      }
+      pascalEl.appendChild(tr);
+    }
+  }
+
+  nInput.addEventListener('input', render);
+  rInput.addEventListener('input', render);
+  render();
+</script>

@@ -1,0 +1,160 @@
+---
+// Interactive FAR comparison across NYC neighborhoods.
+// Sort, filter by borough, see ratio bars relative to FAR 10 ceiling.
+---
+
+<div class="far-widget rounded-xl border border-gray-200 p-6 my-8 bg-white">
+  <div class="flex items-baseline justify-between mb-1">
+    <h3 class="text-lg font-semibold">NYC neighborhoods by FAR</h3>
+    <span class="text-[10px] text-gray-400 uppercase tracking-wider font-mono">Scale 0–24 FAR</span>
+  </div>
+  <p class="text-sm text-gray-600 mb-3">A sampling of real NYC zoning. Bars scale 0–24 (NYC's commercial peak, in special Midtown districts). Click a column header to sort. Filter by borough below.</p>
+
+  <div class="flex flex-wrap gap-1.5 mb-3" id="far-borough-filters"></div>
+
+  <div class="grid grid-cols-12 gap-2 text-[10px] uppercase text-gray-500 font-mono px-2 mb-1 select-none">
+    <button class="col-span-4 text-left hover:text-gray-900 cursor-pointer" data-sort="name">Neighborhood</button>
+    <button class="col-span-2 text-left hover:text-gray-900 cursor-pointer" data-sort="zoning">Zoning</button>
+    <button class="col-span-2 text-right hover:text-gray-900 cursor-pointer" data-sort="far">FAR ↓</button>
+    <div class="col-span-4 text-left">What gets built</div>
+  </div>
+
+  <div id="far-rows" class="max-h-[360px] overflow-y-auto pr-2 -mr-2 space-y-px font-mono text-xs"></div>
+
+  <p class="mt-3 text-xs text-gray-600 italic">~75% of NYC residential land is R1–R5 (FAR ≤ 1.25). The state's Multiple Dwelling Law caps residential at <strong>FAR 12</strong> citywide; commercial special districts (Hudson Yards, Midtown East) reach <strong>18–24</strong>. Most residential supertalls used air-rights transfers and bonuses to clear the FAR 10 R10 cap.</p>
+</div>
+
+<script>
+  type Row = {
+    name: string;
+    borough: 'Manhattan' | 'Brooklyn' | 'Queens' | 'Bronx' | 'Staten Island';
+    zoning: string;
+    far: number;
+    farLabel: string;
+    built: string;
+  };
+
+  const ROWS: Row[] = [
+    { name: 'Hudson Yards (peak)',borough: 'Manhattan',     zoning: 'Spec. HY',    far: 24.0,  farLabel: '24.0',     built: '30 Hudson Yards office' },
+    { name: 'Grand Central core', borough: 'Manhattan',     zoning: 'Spec. ME (\'17)', far: 24.0,  farLabel: '24.0', built: 'One Vanderbilt' },
+    { name: 'Park Ave / GCT',     borough: 'Manhattan',     zoning: 'Spec. ME (\'17)', far: 21.6, farLabel: '21.6', built: '270 Park (JPM HQ)' },
+    { name: 'Hudson Yards',       borough: 'Manhattan',     zoning: 'Spec. HY',    far: 18.0,  farLabel: '18.0',     built: 'Hudson Yards offices' },
+    { name: 'Midtown East ave',   borough: 'Manhattan',     zoning: 'Spec. ME (\'17)', far: 18.0, farLabel: '18.0', built: 'Lexington, Madison towers' },
+    { name: 'Midtown East midblock', borough: 'Manhattan',  zoning: 'Spec. ME (\'17)', far: 14.4, farLabel: '14.4', built: 'Side-street office' },
+    { name: 'Residential max (state)', borough: 'Manhattan', zoning: 'MDL cap',    far: 12.0,  farLabel: '12.0',     built: 'Statutory residential ceiling' },
+    { name: 'Midtown',            borough: 'Manhattan',     zoning: 'C5-3 / R10',  far: 10.0,  farLabel: '10.0',     built: 'Empire State, supertalls' },
+    { name: 'Financial District', borough: 'Manhattan',     zoning: 'C5-5 / R10',  far: 10.0,  farLabel: '10.0',     built: 'Pre-war + new supertalls' },
+    { name: 'Upper East Side',    borough: 'Manhattan',     zoning: 'R10',         far: 10.0,  farLabel: '10.0',     built: 'Park Avenue prewars' },
+    { name: 'Long Island City',   borough: 'Queens',        zoning: 'R10',         far: 10.0,  farLabel: '10.0',     built: 'Court Square towers' },
+    { name: 'Downtown Brooklyn',  borough: 'Brooklyn',      zoning: 'R10',         far: 10.0,  farLabel: '10.0',     built: 'The Brooklyn Tower' },
+    { name: 'Grand Concourse',    borough: 'Bronx',         zoning: 'R8',          far: 6.02,  farLabel: '6.02',     built: 'Art-deco apt blocks' },
+    { name: "Hell's Kitchen",     borough: 'Manhattan',     zoning: 'R8 / R9A',    far: 7.52,  farLabel: '7.52',     built: '15–25 story rentals' },
+    { name: 'Tribeca',            borough: 'Manhattan',     zoning: 'R8A',         far: 6.02,  farLabel: '6.02',     built: '8–12 story lofts' },
+    { name: 'Chelsea',            borough: 'Manhattan',     zoning: 'R8',          far: 6.02,  farLabel: '~6.0',     built: 'High Line midrises' },
+    { name: 'DUMBO',              borough: 'Brooklyn',      zoning: 'R8',          far: 6.02,  farLabel: '~6.0',     built: 'Converted industrial lofts' },
+    { name: 'East Village',       borough: 'Manhattan',     zoning: 'R7',          far: 3.44,  farLabel: '~3.44',    built: '6-story walk-ups + new midrises' },
+    { name: 'Park Slope',         borough: 'Brooklyn',      zoning: 'R7B',         far: 3.0,   farLabel: '3.0–4.0',  built: '4-story limestones' },
+    { name: 'Brooklyn Heights',   borough: 'Brooklyn',      zoning: 'R7',          far: 3.44,  farLabel: '~3.44',    built: 'Brownstones + mid-rises' },
+    { name: 'Greenwich Village',  borough: 'Manhattan',     zoning: 'R7',          far: 3.44,  farLabel: '~3.44',    built: 'Townhouses, low-rises' },
+    { name: 'Williamsburg',       borough: 'Brooklyn',      zoning: 'R6 (\'05)',   far: 2.43,  farLabel: '~2.43',    built: '6–8 story midrises' },
+    { name: 'Jackson Heights',    borough: 'Queens',        zoning: 'R6',          far: 2.43,  farLabel: '~2.43',    built: 'Garden apt cooperatives' },
+    { name: 'Bed-Stuy',           borough: 'Brooklyn',      zoning: 'R6',          far: 2.43,  farLabel: '~2.43',    built: 'Brownstone rowhouses' },
+    { name: 'Astoria',            borough: 'Queens',        zoning: 'R5 / R6',     far: 1.25,  farLabel: '1.25–2.43', built: '3–6 story walk-ups' },
+    { name: 'Bushwick',           borough: 'Brooklyn',      zoning: 'R5',          far: 1.25,  farLabel: '1.25',     built: 'Rowhouses, low walk-ups' },
+    { name: 'Sunset Park',        borough: 'Brooklyn',      zoning: 'R5',          far: 1.25,  farLabel: '1.25',     built: 'Rowhouses' },
+    { name: 'Forest Hills',       borough: 'Queens',        zoning: 'R4',          far: 0.75,  farLabel: '0.75',     built: 'Tudors, small apartments' },
+    { name: 'Bay Ridge',          borough: 'Brooklyn',      zoning: 'R4',          far: 0.75,  farLabel: '0.75',     built: 'Semi-detached homes' },
+    { name: 'Riverdale',          borough: 'Bronx',         zoning: 'R4',          far: 0.75,  farLabel: '0.75',     built: 'Detached suburban' },
+    { name: 'Canarsie',           borough: 'Brooklyn',      zoning: 'R4',          far: 0.75,  farLabel: '0.75',     built: 'Detached + semi-detached' },
+    { name: 'Bayside',            borough: 'Queens',        zoning: 'R4',          far: 0.75,  farLabel: '0.75',     built: 'Detached single-family' },
+    { name: 'Far Rockaway',       borough: 'Queens',        zoning: 'R4',          far: 0.75,  farLabel: '0.75',     built: 'Detached homes' },
+    { name: 'St. George',         borough: 'Staten Island', zoning: 'R6',          far: 2.43,  farLabel: '~2.43',    built: 'Mixed low-mid rise' },
+    { name: 'Throgs Neck',        borough: 'Bronx',         zoning: 'R3',          far: 0.60,  farLabel: '0.5–0.6',  built: 'Single-family detached' },
+    { name: 'Mid-Island',         borough: 'Staten Island', zoning: 'R3',          far: 0.60,  farLabel: '0.5–0.6',  built: 'Detached single-family' },
+    { name: 'South Shore',        borough: 'Staten Island', zoning: 'R1',          far: 0.50,  farLabel: '0.5',      built: 'Suburban single-family' },
+  ];
+
+  const MAX_FAR = 24.0;
+  const BOROUGHS = ['All', 'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'] as const;
+  const BOROUGH_COLORS: Record<string, string> = {
+    Manhattan: 'bg-violet-100 text-violet-800',
+    Brooklyn: 'bg-emerald-100 text-emerald-800',
+    Queens: 'bg-amber-100 text-amber-800',
+    Bronx: 'bg-rose-100 text-rose-800',
+    'Staten Island': 'bg-sky-100 text-sky-800',
+  };
+  const FAR_BAR_COLOR = (far: number) =>
+    far >= 18 ? 'bg-fuchsia-500' :
+    far >= 12 ? 'bg-emerald-500' :
+    far >= 6 ? 'bg-blue-500' :
+    far >= 1.25 ? 'bg-amber-500' :
+    'bg-red-400';
+
+  let activeBorough: string = 'All';
+  let sortKey: 'name' | 'zoning' | 'far' = 'far';
+  let sortDir: 1 | -1 = -1;
+
+  const filterContainer = document.getElementById('far-borough-filters')!;
+  const rowsContainer = document.getElementById('far-rows')!;
+
+  function render() {
+    // Build filter chips
+    filterContainer.innerHTML = '';
+    BOROUGHS.forEach((b) => {
+      const chip = document.createElement('button');
+      const isActive = activeBorough === b;
+      const baseColor = b === 'All' ? 'bg-gray-100 text-gray-800' : BOROUGH_COLORS[b];
+      chip.className = `px-2 py-0.5 rounded-full text-[11px] font-medium border ${isActive ? 'border-gray-900 ring-1 ring-gray-900' : 'border-transparent opacity-70 hover:opacity-100'} ${baseColor} cursor-pointer`;
+      chip.textContent = b;
+      chip.onclick = () => { activeBorough = b; render(); };
+      filterContainer.appendChild(chip);
+    });
+
+    // Filter + sort
+    let filtered = activeBorough === 'All' ? [...ROWS] : ROWS.filter(r => r.borough === activeBorough);
+    filtered.sort((a, b) => {
+      const va = a[sortKey], vb = b[sortKey];
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * sortDir;
+      return String(va).localeCompare(String(vb)) * sortDir;
+    });
+
+    // Render rows
+    rowsContainer.innerHTML = '';
+    filtered.forEach((r) => {
+      const pct = (r.far / MAX_FAR) * 100;
+      const row = document.createElement('div');
+      row.className = 'grid grid-cols-12 gap-2 items-center py-1.5 px-2 hover:bg-gray-50 rounded';
+      row.innerHTML = `
+        <div class="col-span-4 flex items-center gap-2 min-w-0">
+          <span class="truncate font-medium">${r.name}</span>
+          <span class="px-1.5 py-0.5 rounded text-[9px] ${BOROUGH_COLORS[r.borough]} hidden sm:inline-block flex-shrink-0">${r.borough.slice(0,3)}</span>
+        </div>
+        <div class="col-span-2 text-gray-600 truncate">${r.zoning}</div>
+        <div class="col-span-2 flex items-center gap-2 justify-end">
+          <div class="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
+            <div class="${FAR_BAR_COLOR(r.far)} h-full rounded-full" style="width: ${pct}%"></div>
+          </div>
+          <span class="text-right font-semibold tabular-nums">${r.farLabel}</span>
+        </div>
+        <div class="col-span-4 text-gray-600 italic font-sans text-[11px] truncate">${r.built}</div>
+      `;
+      rowsContainer.appendChild(row);
+    });
+
+    if (filtered.length === 0) {
+      rowsContainer.innerHTML = '<div class="text-gray-400 text-center py-6 text-xs italic font-sans">No neighborhoods match.</div>';
+    }
+  }
+
+  // Sort header handlers
+  document.querySelectorAll<HTMLButtonElement>('[data-sort]').forEach((btn) => {
+    btn.onclick = () => {
+      const k = btn.dataset.sort as 'name' | 'zoning' | 'far';
+      if (sortKey === k) sortDir = (sortDir * -1) as 1 | -1;
+      else { sortKey = k; sortDir = k === 'far' ? -1 : 1; }
+      render();
+    };
+  });
+
+  render();
+</script>

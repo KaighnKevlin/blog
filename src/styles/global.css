@@ -92,6 +92,19 @@ p {
 .prose p {
 	margin-bottom: 2em;
 }
+.prose ul {
+	list-style: disc;
+	margin-bottom: 2em;
+	padding-left: 1.5em;
+}
+.prose ol {
+	list-style: decimal;
+	margin-bottom: 2em;
+	padding-left: 1.5em;
+}
+.prose li {
+	margin-bottom: 0.5em;
+}
 textarea {
 	width: 100%;
 	font-size: 16px;

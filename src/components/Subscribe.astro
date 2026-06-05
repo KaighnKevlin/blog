@@ -1,0 +1,72 @@
+---
+import { BUTTONDOWN_USERNAME } from '../consts';
+---
+
+<div class="subscribe">
+	<h3>Subscribe</h3>
+	<p>Get new posts delivered to your inbox.</p>
+	<form
+		action={`https://buttondown.com/api/emails/embed-subscribe/${BUTTONDOWN_USERNAME}`}
+		method="post"
+		target="popupwindow"
+	>
+		<div class="subscribe-form">
+			<input
+				type="email"
+				name="email"
+				placeholder="you@example.com"
+				required
+			/>
+			<button type="submit">Subscribe</button>
+		</div>
+	</form>
+</div>
+
+<style>
+	.subscribe {
+		max-width: 420px;
+		margin: 0 auto 1.5em;
+		text-align: center;
+	}
+	.subscribe h3 {
+		margin: 0 0 0.25em;
+		font-size: 1.1em;
+		color: rgb(var(--gray-dark));
+	}
+	.subscribe p {
+		margin: 0 0 0.75em;
+		font-size: 0.9em;
+		color: rgb(var(--gray));
+	}
+	.subscribe-form {
+		display: flex;
+		gap: 0.5em;
+	}
+	.subscribe-form input {
+		flex: 1;
+		padding: 0.5em 0.75em;
+		border: 1px solid rgb(var(--gray-light));
+		border-radius: 8px;
+		font-family: inherit;
+		font-size: 0.9em;
+	}
+	.subscribe-form input:focus {
+		outline: none;
+		border-color: var(--accent);
+	}
+	.subscribe-form button {
+		padding: 0.5em 1.25em;
+		background: var(--accent);
+		color: white;
+		border: none;
+		border-radius: 8px;
+		font-family: inherit;
+		font-size: 0.9em;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background 0.15s ease;
+	}
+	.subscribe-form button:hover {
+		background: var(--accent-dark);
+	}
+</style>

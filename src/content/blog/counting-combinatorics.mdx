@@ -1,0 +1,100 @@
+---
+title: "How to count things that are too big to count"
+description: "A build-up from counting on your fingers to permutations and combinations — with widgets you can poke. Why a 4-digit PIN has 10,000 options, why a lottery is hopeless, and why order is the whole ballgame."
+pubDate: "Jun 04 2026"
+---
+
+import ChoiceMultiplier from '../../components/ChoiceMultiplier.astro';
+import PermutationLab from '../../components/PermutationLab.astro';
+import OrderMatters from '../../components/OrderMatters.astro';
+import ChooseCalculator from '../../components/ChooseCalculator.astro';
+
+We learn to count as toddlers — one, two, three, point at each duck. That kind of counting works great until the things you want to count won't sit still long enough to point at them. *How many different passwords?* *How many ways to seat eight people at dinner?* *How many lottery tickets would I need to guarantee a win?*
+
+You can't point your way through those. But you can still get an exact answer — often a comically large one — without listing a single case. That's the whole trick of **combinatorics**: counting without enumerating. This post builds it up from scratch. There's a widget every few paragraphs; the math will stick better if you actually play with them.
+
+## The one idea everything rests on
+
+Forget formulas for a second. Here's the only principle you really need:
+
+> **If one choice has _A_ options and a second, independent choice has _B_ options, then making both choices has _A_ × _B_ outcomes.**
+
+Multiply, don't add. That's it. Adding is for "how many ducks total"; multiplying is for "how many *combinations* of choices." It feels almost too simple, so let's watch it happen. Build a sundae: pick how many scoop flavors, sauces, and toppings the shop offers, and count the distinct sundaes.
+
+<ChoiceMultiplier />
+
+Drag a slider and the tree fans out. Every scoop sprouts a full copy of the sauce choices; every sauce sprouts a full copy of the toppings. Three scoops, two sauces, three toppings isn't 3 + 2 + 3 = 8 sundaes — it's 3 × 2 × 3 = 18, because each earlier choice gets to pair with *all* of the later ones.
+
+This scales terrifyingly well, which is the point. A 4-digit PIN is four independent choices, each with 10 options: 10 × 10 × 10 × 10 = **10,000**. A 6-character password using lowercase letters and digits is 36⁶ ≈ **2.2 billion**. Nobody enumerated those. We just multiplied.
+
+## When the choices use each other up
+
+The sundae choices were independent — picking chocolate sauce didn't remove a scoop flavor from the menu. But a lot of counting problems have choices that *consume* the options.
+
+Say eight runners line up for a race. How many ways can the podium — gold, silver, bronze — turn out? Gold has 8 possible runners. But once gold is decided, only 7 runners are left for silver. Then 6 for bronze. So it's 8 × 7 × 6 = **336**. Still the multiplication principle, just with a shrinking menu.
+
+When you keep multiplying a shrinking count all the way down to 1 — 8 × 7 × 6 × 5 × 4 × 3 × 2 × 1 — you get a **factorial**, written `8!`. That's the number of ways to arrange *all* eight runners in order: 40,320. Factorials are what you get when order matters and you use up everything.
+
+Here's a lab for arranging things. Pick a few items and how many slots to fill, then click tiles to build orderings. Each distinct ordering you complete gets recorded. Try to find them all — and notice how fast "all" gets out of hand.
+
+<PermutationLab />
+
+An ordered arrangement like this is a **permutation**. When you fill every slot (r = n), you're counting `n!` total arrangements. When you fill fewer slots than you have items (r < n), you've got a *partial* permutation — the race podium, where you arrange 3 of 8 — and the count is
+
+<div style="text-align:center; font-family:monospace; font-size:1.05rem; margin:1rem 0;">
+  nPr = n! / (n − r)!
+</div>
+
+That formula is less scary than it looks. It just says: start the factorial `n × (n−1) × …`, but stop after `r` factors. Dividing by `(n − r)!` is the bookkeeping that chops off the tail you didn't use. For the podium: 8! / 5! = 8 × 7 × 6 = 336. Same answer as before.
+
+## The plot twist: sometimes order is a lie
+
+Everything so far assumed order matters — that gold-then-silver is a different outcome from silver-then-gold. For a race, sure. But swap the race for a different question:
+
+*Eight runners, but now I'm just picking 3 of them for a relay team — no positions, just "you three."*
+
+Suddenly `{Ann, Bo, Cy}` and `{Cy, Ann, Bo}` are the **same team**. The permutation machine counted them as different, and it counted every other shuffle of those three names too. It overcounted, and it overcounted by an exact, predictable amount.
+
+This is the single most important idea in the whole post, so here's a widget for it. Each row is one underlying group; the cells in a row are all the different *orderings* of that same group. Flip "order matters" off and watch each row collapse.
+
+<OrderMatters />
+
+When order is on, you're looking at `nPr` — every ordering is its own outcome. Flip it off and each row's orderings crunch down into a single survivor. The number of orderings that collapse per row is always the same: it's `r!`, the number of ways to shuffle `r` chosen items among themselves. Three people can be ordered 3! = 6 ways, so the permutation count over-counted each team exactly 6-fold.
+
+So to count *unordered* selections — **combinations** — you take the permutation count and divide out the redundancy:
+
+<div style="text-align:center; font-family:monospace; font-size:1.05rem; margin:1rem 0;">
+  nCr = nPr / r! = n! / (r! · (n − r)!)
+</div>
+
+That's the famous "n choose r." It's just permutations with the order-double-counting refunded.
+
+## Both formulas, side by side
+
+Here's the calculator. Slide `n` and `r` and watch the two numbers diverge — and notice that the gap between them *is* exactly `r!`. The Pascal's triangle at the bottom is a bonus: every `nCr` you can ask for is already sitting in it, and each number is just the sum of the two above it.
+
+<ChooseCalculator />
+
+A few things worth pausing on as you slide:
+
+- **`r = 0` and `r = n` both give 1 combination.** There's one way to pick nobody, and one way to pick everybody. The formula handles it because `0! = 1` — a convention that exists precisely so this comes out right.
+- **`nCr` is symmetric:** choosing 3 of 12 to include is the same as choosing 9 of 12 to leave out, so `12C3 = 12C9`. The triangle is a mirror.
+- **Permutations explode faster than combinations**, and the ratio between them is always `r!`. By the time you're choosing 6 of 12, order-matters gives 665,280 and order-ignored gives 924 — a 720× gap, which is exactly 6!.
+
+## So, the lottery
+
+Back to the question at the top. A typical lottery: pick 6 numbers out of 49, order irrelevant. That's a combination — `49C6`. Plug it in (or trust the calculator): **13,983,816**. Just shy of 14 million.
+
+If order *had* mattered, it'd be `49P6` ≈ 10 billion. The lottery is "only" 14 million precisely because they refund the `6! = 720` ways to reorder your picks. Cold comfort: buying one ticket a week, you'd expect to wait about 270,000 years for a jackpot. Buying every combination to guarantee a win would cost ~$28 million in $2 tickets — occasionally a real arbitrage when jackpots roll over, and [a few syndicates have actually done it](https://en.wikipedia.org/wiki/Lottery_mathematics).
+
+## The whole toolkit on one card
+
+That's genuinely most of introductory combinatorics. The decision tree is small:
+
+- **Do the choices multiply independently?** → multiplication principle, `A × B × C …` (sundaes, PINs, passwords).
+- **Are you arranging things in order, using them up?** → permutations, `nPr = n! / (n−r)!` (race podiums, seating charts, rankings).
+- **Are you just selecting a group, order be damned?** → combinations, `nCr = n! / (r!·(n−r)!)` (teams, committees, lottery tickets, poker hands).
+
+Ninety percent of the work in any real problem is just figuring out which of those three you're looking at — and the tell is almost always the same one question: *does reordering my answer make it a different answer?* If yes, you're permuting. If no, divide by `r!` and you're combining.
+
+The duck-pointing kind of counting tops out around the number of ducks you can stand to look at. This kind doesn't top out at all. That's the upgrade.

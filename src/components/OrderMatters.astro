@@ -1,0 +1,184 @@
+---
+// Animated bridge from permutations to combinations. Lay out every ordered
+// arrangement (nPr), grouped by the underlying set. Flip "does order matter?"
+// off and each group of r! orderings collapses into a single combination —
+// visually showing why nCr = nPr / r!.
+---
+
+<div class="om-widget rounded-xl border border-gray-200 p-6 my-8 bg-white">
+  <div class="flex items-baseline justify-between mb-1">
+    <h3 class="text-lg font-semibold">Does order matter?</h3>
+    <span class="text-[10px] text-gray-400 uppercase tracking-wider font-mono">flip the switch</span>
+  </div>
+  <p class="text-sm text-gray-600 mb-4">Choosing <span id="om-r-text" class="font-mono">2</span> of <span id="om-n-text" class="font-mono">4</span> friends. Each row is one underlying group. Turn order off and watch each group's orderings collapse into one.</p>
+
+  <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mb-5 text-sm">
+    <label class="flex items-center gap-2">
+      <span class="font-medium">Friends (n)</span>
+      <select id="om-n" class="border border-gray-300 rounded px-2 py-1 font-mono bg-white">
+        <option>3</option><option selected>4</option><option>5</option>
+      </select>
+    </label>
+    <label class="flex items-center gap-2">
+      <span class="font-medium">Choose (r)</span>
+      <select id="om-r" class="border border-gray-300 rounded px-2 py-1 font-mono bg-white"></select>
+    </label>
+
+    <button id="om-toggle" class="ml-auto inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors">
+      <span id="om-toggle-dot" class="w-2.5 h-2.5 rounded-full"></span>
+      <span id="om-toggle-label"></span>
+    </button>
+  </div>
+
+  <div class="bg-gray-50 rounded-lg p-3 mb-5 text-center">
+    <div class="font-mono text-lg sm:text-xl" id="om-equation"></div>
+    <div class="text-xs text-gray-500 mt-1" id="om-caption"></div>
+  </div>
+
+  <div id="om-grid" class="space-y-2"></div>
+</div>
+
+<script>
+  const PEOPLE = [
+    { label: 'A', color: '#8b5cf6', emoji: '🦊' },
+    { label: 'B', color: '#10b981', emoji: '🐸' },
+    { label: 'C', color: '#f59e0b', emoji: '🐱' },
+    { label: 'D', color: '#ef4444', emoji: '🐧' },
+    { label: 'E', color: '#0ea5e9', emoji: '🦉' },
+  ];
+
+  const nSel = document.getElementById('om-n') as HTMLSelectElement;
+  const rSel = document.getElementById('om-r') as HTMLSelectElement;
+  const grid = document.getElementById('om-grid')!;
+  const eqEl = document.getElementById('om-equation')!;
+  const capEl = document.getElementById('om-caption')!;
+  const toggle = document.getElementById('om-toggle')!;
+  const toggleDot = document.getElementById('om-toggle-dot')!;
+  const toggleLabel = document.getElementById('om-toggle-label')!;
+  const nText = document.getElementById('om-n-text')!;
+  const rText = document.getElementById('om-r-text')!;
+
+  let n = 4;
+  let r = 2;
+  let orderMatters = true;
+
+  const fact = (x: number): number => (x <= 1 ? 1 : x * fact(x - 1));
+
+  // All r-length permutations of indices [0..n) as arrays.
+  function permutations(items: number[], r: number): number[][] {
+    if (r === 0) return [[]];
+    const out: number[][] = [];
+    items.forEach((it, i) => {
+      const rest = items.slice(0, i).concat(items.slice(i + 1));
+      for (const tail of permutations(rest, r - 1)) out.push([it, ...tail]);
+    });
+    return out;
+  }
+
+  function rebuildR() {
+    const prev = r;
+    rSel.innerHTML = '';
+    for (let i = 1; i <= n; i++) {
+      const o = document.createElement('option');
+      o.value = String(i); o.textContent = String(i);
+      rSel.appendChild(o);
+    }
+    r = Math.min(prev, n);
+    rSel.value = String(r);
+  }
+
+  function chip(idx: number) {
+    const p = PEOPLE[idx];
+    const s = document.createElement('span');
+    s.className = 'inline-flex items-center justify-center w-8 h-8 rounded-lg text-white text-sm font-bold shadow-sm';
+    s.style.backgroundColor = p.color;
+    s.textContent = p.emoji;
+    s.title = p.label;
+    return s;
+  }
+
+  function render() {
+    n = parseInt(nSel.value, 10);
+    r = parseInt(rSel.value, 10);
+    nText.textContent = String(n);
+    rText.textContent = String(r);
+
+    const items = Array.from({ length: n }, (_, i) => i);
+    const perms = permutations(items, r);
+    // Group permutations by their sorted set (the combination).
+    const groups = new Map<string, number[][]>();
+    for (const p of perms) {
+      const key = [...p].sort((a, b) => a - b).join(',');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(p);
+    }
+
+    const nPr = perms.length;
+    const rFact = fact(r);
+    const nCr = nPr / rFact;
+
+    // Toggle styling
+    toggle.classList.toggle('bg-violet-600', orderMatters);
+    toggle.classList.toggle('text-white', orderMatters);
+    toggle.classList.toggle('border-violet-600', orderMatters);
+    toggle.classList.toggle('bg-white', !orderMatters);
+    toggle.classList.toggle('text-gray-600', !orderMatters);
+    toggle.classList.toggle('border-gray-300', !orderMatters);
+    toggleDot.style.backgroundColor = orderMatters ? '#fff' : '#9ca3af';
+    toggleLabel.textContent = orderMatters ? 'Order matters (a race)' : 'Order ignored (a group)';
+
+    if (orderMatters) {
+      eqEl.innerHTML = `${n}P${r} = <span class="font-bold text-violet-700">${nPr}</span> ordered arrangements`;
+      capEl.textContent = `Every reordering is its own outcome — like 1st/2nd/3rd place.`;
+    } else {
+      eqEl.innerHTML = `${n}C${r} = ${n}P${r} / ${r}! = ${nPr} / ${rFact} = <span class="font-bold text-emerald-700">${nCr}</span> groups`;
+      capEl.textContent = `Each row's ${rFact} ordering${rFact === 1 ? '' : 's'} collapse into one group.`;
+    }
+
+    grid.innerHTML = '';
+    for (const [, members] of groups) {
+      const row = document.createElement('div');
+      row.className = 'flex flex-wrap items-center gap-2 p-1.5 rounded-lg bg-gray-50 border border-gray-100';
+
+      members.forEach((perm, i) => {
+        const cell = document.createElement('div');
+        const collapsed = !orderMatters && i > 0;
+        cell.className = 'flex items-center gap-1 px-1.5 py-1 rounded-md bg-white border border-gray-200 transition-all duration-500';
+        if (collapsed) {
+          cell.style.opacity = '0';
+          cell.style.transform = 'scale(0.4)';
+          cell.style.width = '0px';
+          cell.style.padding = '0px';
+          cell.style.margin = '0px';
+          cell.style.borderWidth = '0px';
+          cell.style.overflow = 'hidden';
+        } else {
+          cell.style.opacity = '1';
+          cell.style.transform = 'scale(1)';
+        }
+        perm.forEach((idx) => cell.appendChild(chip(idx)));
+        row.appendChild(cell);
+      });
+
+      if (!orderMatters) {
+        const tag = document.createElement('span');
+        tag.className = 'text-xs text-emerald-600 font-medium ml-1';
+        tag.textContent = '= 1 group';
+        row.appendChild(tag);
+      } else if (members.length > 1) {
+        const tag = document.createElement('span');
+        tag.className = 'text-[11px] text-gray-400 ml-1 font-mono';
+        tag.textContent = `${members.length} orderings`;
+        row.appendChild(tag);
+      }
+      grid.appendChild(row);
+    }
+  }
+
+  nSel.addEventListener('change', () => { rebuildR(); render(); });
+  rSel.addEventListener('change', render);
+  toggle.addEventListener('click', () => { orderMatters = !orderMatters; render(); });
+
+  rebuildR();
+  render();
+</script>
