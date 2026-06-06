@@ -1,0 +1,65 @@
+---
+title: "Connect 4"
+description: "Two Wolves: Alphas vs Betas in Connect 4"
+pubDate: "Jun 06 2026"
+---
+
+import Connect4 from '../../components/Connect4.astro';
+
+Gather round, kids. Let me tell you a story about AI. No, not the [Mecha Hitler](https://mashable.com/article/grok-antisemitic-posts-deleted) new fangled LLM stuff. I'm talking about old school AI. That old shit. That 1920's shit.
+
+Before I was sending all my blood tests straight to Sam Altman's inbox, I was an eager and meager college student taking a graduate AI course. This was in 2014, mind you, so computers hadn't been quite invented just yet. So instead of running a bunch of matrix multiplications on my [mom's gaming PC](https://en.wikipedia.org/wiki/AlexNet#:~:text=AlexNet%20was%20trained%20on%202%20Nvidia%20GTX%20580%20in%20Krizhevsky%27s%20bedroom%20at%20his%20parents%27%20house.), we were just trying to solve games the good ole fashioned way.
+
+So buckle up, we're gonna take a journey through AI techniques using my old favorite game, Connect 4. I got drunk at a wedding recently and played giant connect 4, and the loss still stings. Fuck you Andrew.
+
+Let's see if you can beat my ultra sophisticated connect 4 AI:
+
+<Connect4 ai="random" title="The Coin Flip" subtitle="picks a column at random" />
+
+Yeah, didn't think so. Now what actually seemed like intelligent play was actually just random selections, believe it or not. But, we can do better!
+
+Here's an AI with some lovingly hand-crafted, farm to table "heuristics" that guide to make moves according to a few simple rules. Like - center GOOD, human about to have 3 in a row BAD, and winning GOOD.
+
+This was the early days of what are called "expert systems" - where a human expert just sits down and makes a bunch of easy to implement rules that we humans know are good shit. Like that middle column? Pretty damn good. If you think about it, basically every connect 4 win has at least one piece in the middle column. So hungry hungry hippos those spaces if you know what's good for ye.
+
+<Connect4 ai="heuristic" title="The Expert System" subtitle="a handful of hand-crafted rules" />
+
+Okay so even my shitty heuristic AI can beat your ass most of the time. Not a good look for you, human. But let's crank it up even further. If you think about it, if you had a galaxy big brain, you could Dr. Strange the entire thing. Like, think about each possible path of [you move here, I move there, you move there] and deduce how to win.
+
+In computer science we use a "tree" metaphor to represent this idea. If you like Marvel (what? ew), think of it in terms of multiverses. And just like Marvel, it gets pretty exhausting pretty quickly.
+
+We call this "mini max." Basically, I'm trying to minimize your aura, while simultaneously trying to maximize my rizz. Minimum maximum - minimax. Or something like that, idk.
+
+The only problem is the Marvel problem. Your tiny computer needs to look at like 6 trillion possible ways this game could go. With a modern computer, that could take like 3 hours. And for more complicated games like chess or Go - forget about it.
+
+So assuming you don't want me to crash your computer for the next 3 hours, the AI has got to learn when to call it quits. A lesson Marvel should've learned long ago. Basically, rather than galaxy brain the game from the 1st move to the 30th move, we just cut the "depth" to look only like 5 or 6 moves ahead. Then, after simulating all possible games 6 moves ahead, the AI will just look around at each unfinished game, squint it's eyes, and pick the one it thinks is best using… you guessed it… heuristics. This combo approach is pretty hard to beat, even with a depth of 6.
+
+<Connect4 ai="minimax" depth={6} showEval title="Minimax" subtitle="searches 6 moves ahead" />
+
+If you beat this, text me this secret code `aisux` so that I know for sure you actually beat it.
+
+But, we can do even better. Idk why we're going further because there's little hope for the human race, and we haven't even gotten to chatgpt yet.
+
+Turns out, you can eliminate like 50-90% of the work done by the minimax algorithm, for free. It's called alpha beta pruning.
+
+Within you, there are two wolves - the Alpha, and the Beta. The alpha wants to max his bench press. He looks at all the options available to him - hopping on the sauce, taking creatine, or just working out. Since hopping on the sauce is a better option than doing bench presses, he'll just cut that shit out. No need to worry about any followups - like how many bench press sets to do, how much weight, how many reps, how many reps in reserve… he prunes this whole line of thinking from his big brained skull.
+
+And then there's the Beta. He lives life in fear of losing. The beta imagines that the opponent is actually an Alpha. And that scares the little beta. So he lives his life trying to prevent the opponent from doing any Alpha moves. He might lobby the government to make steroid use illegal, for instance. That way, the enemy alpha will be forced to just work on his bench press.
+
+So by the power of friendship, the alpha and the beta team up to fuck up your shit. This means they'll be able to search at a higher depth since they prune so many branches of work. Good luck:
+
+<Connect4 ai="alphabeta" depth={6} showControls title="Alpha-Beta Pruning" subtitle="two wolves, adjustable depth" />
+
+Alright, you lost. Don't even cap.
+
+Let's fast forward through a bunch of other stuff we're leaving out.
+
+Turns out though, this whole post was a waste of fucking time. Because guess what? Connect 4 is [solved](https://www.youtube.com/watch?v=KaljD3Q3ct0), baby. SOLVED
+
+What does this mean? A: You can't win. Some guy made [a paper in 1988](https://tromp.github.io/c4/connect4_thesis.pdf) before you were born saying "you will NEVER be him." If the AI goes first, they can always win by move 41. It's impossible to beat.
+
+Back in '88, computers weren't fast enough yet. Amazon'ing new toys for my foster cat took ages back then. So the minimax thing - couldn't be done. Not to the full depth, at least. And that meant we didn't actually know if perfect play was possible. Turns out, it is - and your shits about to get even more wrecked:
+
+<Connect4 ai="solver" aiFirst title="The Solver" subtitle="perfect play · it moves first" />
+
+Ok, there you have it. A history of AI that ends in a technique developed in 1928. Since then, for the next 100 years we've been in an AI "[winter](https://en.wikipedia.org/wiki/AI_winter)" - and there's nothing else of note to talk about. Maybe one day we'll go through hot AI summer again. Now, go play an unsolved game! Like a good ole game of [dots & boxes](https://www.youtube.com/watch?v=KboGyIilP6k&t=3s) on a 5x5 grid.

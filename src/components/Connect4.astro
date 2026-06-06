@@ -1,0 +1,927 @@
+---
+// Interactive Connect 4. Human (red) moves first; the AI (yellow) responds.
+// The opponent's strategy is chosen per-instance via the `ai` prop so the same
+// board can be reused for every rung of the post's algorithm ladder:
+//   "random"    — pick any non-full column (comically bad baseline)
+//   "heuristic" — two-ply reflex: win / block / fork / refuse-to-lose / develop
+//   "minimax"   — depth-limited search, terminal-only scoring (no eval, no pruning)
+// `depth` sets the minimax search depth (ignored by other strategies).
+// The script initialises every .c4-widget on the page independently, so a post
+// can embed several boards at once.
+interface Props {
+  ai?: 'random' | 'heuristic' | 'minimax';
+  depth?: number;
+  showEval?: boolean;
+  showControls?: boolean;
+  aiFirst?: boolean;
+  title?: string;
+  subtitle?: string;
+}
+const { ai = 'random', depth = 6, showEval = false, showControls = false, aiFirst = false, title = 'Connect 4', subtitle = 'you vs. random AI' } = Astro.props;
+---
+
+<div class="c4-widget rounded-xl border border-gray-200 p-6 my-8 bg-white" data-ai={ai} data-depth={depth} data-eval={showEval ? '1' : undefined} data-controls={showControls ? '1' : undefined} data-aifirst={aiFirst ? '1' : undefined}>
+  <div class="flex items-baseline justify-between mb-4">
+    <h3 class="text-lg font-semibold">{title}</h3>
+    <span class="text-[10px] text-gray-400 uppercase tracking-wider font-mono">{subtitle}</span>
+  </div>
+
+  <div data-c4="status" class="text-sm font-medium mb-3 h-5" aria-live="polite"></div>
+
+  <div class="flex justify-center">
+    <div class="inline-block rounded-xl bg-blue-700 p-2 sm:p-3 shadow-inner">
+      <div data-c4="board" class="grid gap-1.5 sm:gap-2" style="grid-template-columns: repeat(7, minmax(0, 1fr));"></div>
+    </div>
+  </div>
+
+  <div data-c4="panel" class="mt-4"></div>
+
+  <div class="flex justify-center mt-4">
+    <button data-c4="reset" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">
+      New game
+    </button>
+  </div>
+</div>
+
+<script>
+  type Cell = { r: number; c: number };
+  type Strategy = 'random' | 'heuristic' | 'minimax' | 'alphabeta' | 'solver';
+  type SolveResult = { col: number; score: number; mate: boolean };
+
+  const COLS = 7;
+  const ROWS = 6;
+  const HUMAN = 1;
+  const AI = 2;
+  const DISC_SHADOW = 'inset 0 -3px 6px rgba(0,0,0,0.25)';
+  // Column search order, most central first — the reflex AI's tie-breaker.
+  const CENTER_ORDER = [3, 2, 4, 1, 5, 0, 6];
+  // Node budget for the solver search before it falls back on the heuristic.
+  // Late-game trees fit easily (so it plays perfectly and proves wins); early
+  // game it runs out and plays "merely" very strong.
+  const SOLVER_BUDGET = 2_000_000;
+
+  // The perfect-play solver runs in a Web Worker so deep searches never freeze
+  // the page. It's a self-contained negamax-to-the-end with alpha-beta, a
+  // transposition table, and centre-first move ordering — the whole "grandmaster"
+  // in ~50 lines. Built from a Blob so the component stays single-file.
+  const WORKER_SRC = `
+    const W = 7, H = 6, WIN = 10000;
+    const ORDER = [3, 2, 4, 1, 5, 0, 6];
+    const idx = (r, c) => r * W + c;
+    let budget = 0;
+
+    function dropRow(b, c) {
+      for (let r = H - 1; r >= 0; r--) if (b[idx(r, c)] === 0) return r;
+      return -1;
+    }
+    function isWinAt(b, r, c, p) {
+      const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+      for (const [dr, dc] of dirs) {
+        let n = 1;
+        for (const s of [1, -1]) {
+          let rr = r + dr * s, cc = c + dc * s;
+          while (rr >= 0 && rr < H && cc >= 0 && cc < W && b[idx(rr, cc)] === p) { n++; rr += dr * s; cc += dc * s; }
+        }
+        if (n >= 4) return true;
+      }
+      return false;
+    }
+    // Heuristic used only when the node budget runs out, from p's perspective.
+    function evalFor(b, p) {
+      const o = p === 1 ? 2 : 1;
+      let s = 0, ce = 0;
+      for (let r = 0; r < H; r++) { const v = b[idx(r, 3)]; if (v === p) ce++; else if (v === o) ce--; }
+      s += ce * 3;
+      const w4 = (a, bb, cc, d) => {
+        let me = 0, op = 0;
+        for (const v of [a, bb, cc, d]) { if (v === p) me++; else if (v === o) op++; }
+        if (me > 0 && op > 0) return 0;
+        if (me === 3) return 6; if (me === 2) return 2;
+        if (op === 3) return -7; if (op === 2) return -2;
+        return 0;
+      };
+      for (let r = 0; r < H; r++) for (let c = 0; c <= W - 4; c++) s += w4(b[idx(r,c)], b[idx(r,c+1)], b[idx(r,c+2)], b[idx(r,c+3)]);
+      for (let c = 0; c < W; c++) for (let r = 0; r <= H - 4; r++) s += w4(b[idx(r,c)], b[idx(r+1,c)], b[idx(r+2,c)], b[idx(r+3,c)]);
+      for (let r = 0; r <= H - 4; r++) for (let c = 0; c <= W - 4; c++) s += w4(b[idx(r,c)], b[idx(r+1,c+1)], b[idx(r+2,c+2)], b[idx(r+3,c+3)]);
+      for (let r = 0; r <= H - 4; r++) for (let c = 3; c < W; c++) s += w4(b[idx(r,c)], b[idx(r+1,c-1)], b[idx(r+2,c-2)], b[idx(r+3,c-3)]);
+      return s;
+    }
+    function negamax(b, p, moves, alpha, beta, tt) {
+      budget--;
+      for (const c of ORDER) { const r = dropRow(b, c); if (r >= 0 && isWinAt(b, r, c, p)) return WIN - moves; }
+      if (moves >= W * H) return 0;            // board full → draw
+      if (budget <= 0) return evalFor(b, p);   // out of budget → heuristic
+      const key = b.join('') + p;
+      const e = tt.get(key); const aOrig = alpha;
+      if (e !== undefined) {
+        if (e.f === 0) return e.v;
+        else if (e.f === 1) { if (e.v > alpha) alpha = e.v; }
+        else { if (e.v < beta) beta = e.v; }
+        if (alpha >= beta) return e.v;
+      }
+      const o = p === 1 ? 2 : 1;
+      let best = -Infinity;
+      for (const c of ORDER) {
+        const r = dropRow(b, c); if (r < 0) continue;
+        b[idx(r, c)] = p;
+        const sc = -negamax(b, o, moves + 1, -beta, -alpha, tt);
+        b[idx(r, c)] = 0;
+        if (sc > best) best = sc;
+        if (best > alpha) alpha = best;
+        if (alpha >= beta) break;
+      }
+      tt.set(key, { v: best, f: best <= aOrig ? 2 : best >= beta ? 1 : 0 });
+      return best;
+    }
+    function solve(b, p, budgetN) {
+      budget = budgetN;
+      const tt = new Map();
+      let moves = 0; for (const v of b) if (v !== 0) moves++;
+      for (const c of ORDER) { const r = dropRow(b, c); if (r >= 0 && isWinAt(b, r, c, p)) return { col: c, score: WIN - moves, mate: true }; }
+      const o = p === 1 ? 2 : 1;
+      let best = -Infinity, bestCol = -1, alpha = -Infinity;
+      for (const c of ORDER) {
+        const r = dropRow(b, c); if (r < 0) continue;
+        b[idx(r, c)] = p;
+        const sc = -negamax(b, o, moves + 1, -Infinity, -alpha, tt);
+        b[idx(r, c)] = 0;
+        if (sc > best) { best = sc; bestCol = c; }
+        if (best > alpha) alpha = best;
+      }
+      return { col: bestCol, score: best, mate: Math.abs(best) >= WIN - W * H };
+    }
+    self.onmessage = (ev) => {
+      const { board, player, budget } = ev.data;
+      self.postMessage(solve(board.slice(), player, budget));
+    };
+  `;
+
+  function initBoard(root: HTMLElement) {
+    const strategy = (root.dataset.ai as Strategy) || 'random';
+    let maxDepth = Math.max(1, parseInt(root.dataset.depth || '6', 10));
+    // The eval overlay only makes sense for strategies that score columns.
+    const showEval = root.dataset.eval === '1' && strategy === 'minimax';
+    // The depth slider is for the alpha-beta rung; the node-counter line is shown
+    // there and on the minimax board, so the pruning is visible side by side.
+    const showControls = root.dataset.controls === '1' && strategy === 'alphabeta';
+    const showNodeStats = showControls || (strategy === 'minimax' && showEval);
+    const aiFirst = root.dataset.aifirst === '1';
+    const boardEl = root.querySelector<HTMLElement>('[data-c4="board"]')!;
+    const statusEl = root.querySelector<HTMLElement>('[data-c4="status"]')!;
+    const resetBtn = root.querySelector<HTMLElement>('[data-c4="reset"]')!;
+    const panelEl = root.querySelector<HTMLElement>('[data-c4="panel"]')!;
+    let nodeCount = 0; // positions visited by the most recent search
+
+    // board[r][c], row 0 is the top. 0 = empty, 1 = human, 2 = ai.
+    let board: number[][] = [];
+    let gameOver = false;
+    let busy = false; // lock input while the AI is "thinking"
+    let winLine: Cell[] | null = null; // the cells that won, once decided
+    let discEls: (HTMLElement | null)[][] = []; // disc element per cell
+
+    function newGame() {
+      board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      gameOver = false;
+      busy = false;
+      winLine = null;
+      statusEl.textContent = 'Your move — pick a column.';
+      statusEl.className = 'text-sm font-medium mb-3 h-5 text-gray-700';
+      render();
+      clearEvalOverlay();
+      if (aiFirst) beginAiTurn(); // the AI opens
+    }
+
+    // Lowest empty row in a column, or -1 if full.
+    function dropRow(c: number): number {
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (board[r][c] === 0) return r;
+      }
+      return -1;
+    }
+
+    function validCols(): number[] {
+      const cols: number[] = [];
+      for (let c = 0; c < COLS; c++) if (dropRow(c) >= 0) cols.push(c);
+      return cols;
+    }
+
+    function stoneCount(): number {
+      let n = 0;
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (board[r][c] !== 0) n++;
+      return n;
+    }
+
+    function place(c: number, player: number): Cell | null {
+      const r = dropRow(c);
+      if (r < 0) return null;
+      board[r][c] = player;
+      return { r, c };
+    }
+
+    // If `player` has four in a row through (r0,c0), return that run; else null.
+    function winningLine(r0: number, c0: number, player: number): Cell[] | null {
+      const dirs = [
+        [0, 1],  // horizontal
+        [1, 0],  // vertical
+        [1, 1],  // diagonal ↘
+        [1, -1], // diagonal ↙
+      ];
+      for (const [dr, dc] of dirs) {
+        const line: Cell[] = [{ r: r0, c: c0 }];
+        for (const sign of [1, -1]) {
+          let r = r0 + dr * sign;
+          let c = c0 + dc * sign;
+          while (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === player) {
+            line.push({ r, c });
+            r += dr * sign;
+            c += dc * sign;
+          }
+        }
+        if (line.length >= 4) {
+          line.sort((a, b) => a.r - b.r || a.c - b.c);
+          return line;
+        }
+      }
+      return null;
+    }
+
+    function isBoardFull(): boolean {
+      return board[0].every((v) => v !== 0);
+    }
+
+    // ---- AI strategies ------------------------------------------------------
+
+    // Would dropping `player` into column c win immediately? (non-mutating)
+    function winsAt(c: number, player: number): boolean {
+      const r = dropRow(c);
+      if (r < 0) return false;
+      board[r][c] = player;
+      const win = !!winningLine(r, c, player);
+      board[r][c] = 0;
+      return win;
+    }
+
+    // Columns where `player` could win by dropping right now.
+    function immediateWins(player: number): number[] {
+      return validCols().filter((c) => winsAt(c, player));
+    }
+
+    const mostCentral = (cols: number[]): number =>
+      [...cols].sort((a, b) => CENTER_ORDER.indexOf(a) - CENTER_ORDER.indexOf(b))[0];
+
+    // Would dropping the AI into c give it two-or-more immediate winning replies
+    // the human can't all block — a guaranteed win? (Only counts if the human
+    // can't simply win first.)
+    function createsAiFork(c: number): boolean {
+      const r = dropRow(c);
+      if (r < 0) return false;
+      board[r][c] = AI;
+      const fork = immediateWins(HUMAN).length === 0 && immediateWins(AI).length >= 2;
+      board[r][c] = 0;
+      return fork;
+    }
+
+    // Is dropping the AI into c a losing move — i.e. after it, the human can
+    // either win immediately, or play a reply that leaves them with a double
+    // threat (e.g. an open-ended three) that can't be fully blocked?
+    function allowsHumanWinOrFork(c: number): boolean {
+      const r = dropRow(c);
+      if (r < 0) return false;
+      board[r][c] = AI;
+      let bad = false;
+      if (immediateWins(HUMAN).length >= 1) {
+        bad = true; // human just wins on top
+      } else {
+        for (const d of validCols()) {
+          const rd = dropRow(d);
+          board[rd][d] = HUMAN;
+          const fork = immediateWins(HUMAN).length >= 2;
+          board[rd][d] = 0;
+          if (fork) { bad = true; break; }
+        }
+      }
+      board[r][c] = 0;
+      return bad;
+    }
+
+    // How many immediate winning replies would the AI have after dropping in c?
+    // Used as a cheap "offense" signal — more threats means closer to a fork.
+    function aiThreatsAfter(c: number): number {
+      const r = dropRow(c);
+      if (r < 0) return 0;
+      board[r][c] = AI;
+      const t = immediateWins(AI).length;
+      board[r][c] = 0;
+      return t;
+    }
+
+    // Choose among non-forced moves: prefer the most threats created, then the
+    // centre, and break remaining ties at random so play isn't robotic.
+    function pickDeveloping(pool: number[]): number {
+      let best: number[] = [];
+      let bestScore = -Infinity;
+      for (const c of pool) {
+        // Threats dominate; centrality (0 = centre … -6 = edge) breaks ties.
+        const score = aiThreatsAfter(c) * 100 - CENTER_ORDER.indexOf(c);
+        if (score > bestScore) { bestScore = score; best = [c]; }
+        else if (score === bestScore) best.push(c);
+      }
+      return best[Math.floor(Math.random() * best.length)];
+    }
+
+    // Two-ply reflex agent. In priority order: win now; block the human's
+    // immediate win; take a winning fork of our own; drop any move that lets the
+    // human win or build an unstoppable double threat next turn; then from what's
+    // left, build our own threats and favour the centre.
+    function heuristicMove(valid: number[]): number {
+      const aiWin = valid.find((c) => winsAt(c, AI));
+      if (aiWin !== undefined) return aiWin;                       // 1. win now
+
+      const humanWins = immediateWins(HUMAN);
+      if (humanWins.length) return mostCentral(humanWins);         // 2. block their win
+
+      const forks = valid.filter(createsAiFork);
+      if (forks.length) return mostCentral(forks);                 // 3. make our own fork
+
+      const safe = valid.filter((c) => !allowsHumanWinOrFork(c));  // 4. refuse to set up a loss
+      return pickDeveloping(safe.length ? safe : valid);           // 5. build threats / centre
+    }
+
+    // ---- Minimax + evaluation -----------------------------------------------
+    // Depth-limited search: imagine every line of play to `maxDepth` plies. A
+    // finished four-in-a-row is scored decisively (wins high, losses low, fading
+    // with depth so it grabs the fastest win and stalls the slowest loss). When
+    // the search hits its horizon without a result, it falls back on a position
+    // *evaluation* — a guess at who stands better — instead of shrugging with 0.
+    const WIN_SCORE = 100000;
+
+    // Static evaluation of the current board, AI's perspective. Scores every
+    // length-4 "window": a window holding only one colour is a potential four,
+    // worth more the closer it is to complete; mixed windows are dead. Plus a
+    // bonus for owning the centre column, where the most lines cross.
+    function windowScore(r: number, c: number, dr: number, dc: number): number {
+      let ai = 0, hu = 0;
+      for (let i = 0; i < 4; i++) {
+        const v = board[r + dr * i][c + dc * i];
+        if (v === AI) ai++;
+        else if (v === HUMAN) hu++;
+      }
+      if (ai > 0 && hu > 0) return 0;        // contested → nobody can fill it
+      if (ai === 3) return 6;
+      if (ai === 2) return 2;
+      if (hu === 3) return -7;               // weight defence a touch higher
+      if (hu === 2) return -2;
+      return 0;
+    }
+
+    function evaluate(): number {
+      let score = 0;
+      let centre = 0;
+      for (let r = 0; r < ROWS; r++) {
+        if (board[r][3] === AI) centre++;
+        else if (board[r][3] === HUMAN) centre--;
+      }
+      score += centre * 3;
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c <= COLS - 4; c++) score += windowScore(r, c, 0, 1);   // —
+      for (let c = 0; c < COLS; c++)
+        for (let r = 0; r <= ROWS - 4; r++) score += windowScore(r, c, 1, 0);   // |
+      for (let r = 0; r <= ROWS - 4; r++)
+        for (let c = 0; c <= COLS - 4; c++) score += windowScore(r, c, 1, 1);   // ↘
+      for (let r = 0; r <= ROWS - 4; r++)
+        for (let c = 3; c < COLS; c++) score += windowScore(r, c, 1, -1);       // ↙
+      return score;
+    }
+
+    // Columns to try, most central first — better move ordering means alpha-beta
+    // finds good moves early and prunes more.
+    const orderedCols = (): number[] =>
+      validCols().sort((a, b) => CENTER_ORDER.indexOf(a) - CENTER_ORDER.indexOf(b));
+
+    // Best achievable score (from the AI's perspective) when it's `toMove`'s turn,
+    // with `depth` plies of lookahead remaining. Plain minimax — visits the whole
+    // tree (we count nodes to contrast with alpha-beta below).
+    function search(toMove: number, depth: number): number {
+      nodeCount++;
+      const valid = validCols();
+      if (valid.length === 0) return 0;     // board full → draw
+      if (depth === 0) return evaluate();   // horizon → fall back on the eval
+
+      const opp = toMove === AI ? HUMAN : AI;
+      let best = toMove === AI ? -Infinity : Infinity;
+
+      for (const c of valid) {
+        const r = dropRow(c);
+        board[r][c] = toMove;
+        let score: number;
+        if (winningLine(r, c, toMove)) {
+          // Prefer sooner wins / later losses by nudging with remaining depth.
+          score = toMove === AI ? WIN_SCORE + depth : -WIN_SCORE - depth;
+        } else {
+          score = search(opp, depth - 1);
+        }
+        board[r][c] = 0;
+        best = toMove === AI ? Math.max(best, score) : Math.min(best, score);
+      }
+      return best;
+    }
+
+    // Identical logic to search(), but carrying an [alpha, beta] window: once a
+    // branch can't change the decision, stop exploring it. Same scores, far fewer
+    // nodes. Returns the AI-perspective value.
+    function searchAB(toMove: number, depth: number, alpha: number, beta: number): number {
+      nodeCount++;
+      const valid = orderedCols();
+      if (valid.length === 0) return 0;
+      if (depth === 0) return evaluate();
+
+      const opp = toMove === AI ? HUMAN : AI;
+      let best = toMove === AI ? -Infinity : Infinity;
+
+      for (const c of valid) {
+        const r = dropRow(c);
+        board[r][c] = toMove;
+        const score = winningLine(r, c, toMove)
+          ? (toMove === AI ? WIN_SCORE + depth : -WIN_SCORE - depth)
+          : searchAB(opp, depth - 1, alpha, beta);
+        board[r][c] = 0;
+        if (toMove === AI) {
+          best = Math.max(best, score);
+          alpha = Math.max(alpha, best);
+        } else {
+          best = Math.min(best, score);
+          beta = Math.min(beta, best);
+        }
+        if (alpha >= beta) break; // this branch can't affect the outcome — prune
+      }
+      return best;
+    }
+
+    // Root move selection. `useAB` picks the engine; both score every root column
+    // with a full window, so they agree on the move — only the node counts differ.
+    function rootMove(useAB: boolean): number {
+      let best: number[] = [];
+      let bestScore = -Infinity;
+      for (const c of orderedCols()) {
+        const r = dropRow(c);
+        board[r][c] = AI;
+        const score = winningLine(r, c, AI)
+          ? WIN_SCORE + maxDepth
+          : useAB
+            ? searchAB(HUMAN, maxDepth - 1, -Infinity, Infinity)
+            : search(HUMAN, maxDepth - 1);
+        board[r][c] = 0;
+        if (score > bestScore) { bestScore = score; best = [c]; }
+        else if (score === bestScore) best.push(c);
+      }
+      return mostCentral(best);
+    }
+
+    const minimaxMove = (): number => rootMove(false);
+
+    // The AI's score for playing each column right now (null = column full).
+    // Same computation minimaxMove uses, exposed for the eval overlay.
+    function scoreColumns(): (number | null)[] {
+      const scores: (number | null)[] = Array(COLS).fill(null);
+      for (let c = 0; c < COLS; c++) {
+        const r = dropRow(c);
+        if (r < 0) continue;
+        board[r][c] = AI;
+        scores[c] = winningLine(r, c, AI) ? WIN_SCORE + maxDepth : search(HUMAN, maxDepth - 1);
+        board[r][c] = 0;
+      }
+      return scores;
+    }
+
+    // Node counts from the most recent alpha-beta move, for the stats panel.
+    let lastABNodes = 0;
+    let lastMMNodes: number | null = null;
+
+    // Choose with alpha-beta and record how many nodes it visited — plus, when
+    // it's cheap enough to run, how many plain minimax would have, to show the
+    // pruning. Both pick the same move.
+    function alphaBetaChoice(): number {
+      nodeCount = 0;
+      const move = rootMove(true);
+      lastABNodes = nodeCount;
+      // Plain minimax explodes past depth 6 (~0.5s at 7, ~3s at 8) — only run it
+      // for the comparison where it stays fast; otherwise that's the whole point.
+      if (maxDepth <= 6) {
+        nodeCount = 0;
+        rootMove(false); // recompute with minimax purely to count its nodes
+        lastMMNodes = nodeCount;
+      } else {
+        lastMMNodes = null;
+      }
+      return move;
+    }
+
+    function chooseMove(valid: number[]): number {
+      if (strategy === 'heuristic') return heuristicMove(valid);
+      if (strategy === 'minimax') return minimaxMove();
+      if (strategy === 'alphabeta') return alphaBetaChoice();
+      return valid[Math.floor(Math.random() * valid.length)];
+    }
+
+    // ---- Eval overlay -------------------------------------------------------
+    // A bar per column showing how the AI rates playing there: diverging from a
+    // centre baseline, green = good for the AI, red = bad. A forced win/loss pegs
+    // the bar full; ordinary positions scale by EVAL_SCALE so a clear advantage
+    // fills most of the bar.
+    const EVAL_SCALE = 20;
+    let evalEl: HTMLElement | null = null;
+    let evalBars: HTMLElement[] = [];
+    let evalLabels: HTMLElement[] = [];
+
+    function buildEvalOverlay() {
+      if (!showEval) return;
+      evalEl = document.createElement('div');
+      evalEl.className = 'grid gap-1.5 sm:gap-2 mb-2';
+      evalEl.style.gridTemplateColumns = 'repeat(7, minmax(0, 1fr))';
+      for (let c = 0; c < COLS; c++) {
+        const colWrap = document.createElement('div');
+        colWrap.className = 'flex flex-col items-center justify-end';
+        const track = document.createElement('div');
+        track.className = 'relative w-full rounded';
+        track.style.height = '34px';
+        track.style.backgroundColor = 'rgba(255,255,255,0.12)';
+        // Centre baseline.
+        const base = document.createElement('div');
+        base.className = 'absolute left-0 right-0';
+        base.style.top = '50%';
+        base.style.height = '1px';
+        base.style.backgroundColor = 'rgba(255,255,255,0.4)';
+        const bar = document.createElement('div');
+        bar.className = 'absolute left-[28%] right-[28%] rounded-sm transition-all duration-300';
+        track.appendChild(base);
+        track.appendChild(bar);
+        const label = document.createElement('div');
+        label.className = 'text-[9px] leading-tight font-mono text-white/80 mt-0.5 h-3';
+        colWrap.appendChild(track);
+        colWrap.appendChild(label);
+        evalEl.appendChild(colWrap);
+        evalBars.push(bar);
+        evalLabels.push(label);
+      }
+      // Sit the overlay just above the board grid, inside the blue frame.
+      boardEl.parentElement!.insertBefore(evalEl, boardEl);
+    }
+
+    const PICK_RING = '0 0 0 2px #fff, 0 0 8px rgba(255,255,255,0.6)';
+    let evalPick = -1; // column the AI will play, revealed a beat after the bars
+
+    function clearEvalOverlay() {
+      evalPick = -1;
+      if (!evalEl) return;
+      evalBars.forEach((bar, c) => {
+        bar.style.height = '0px';
+        bar.style.boxShadow = 'none';
+        evalLabels[c].textContent = '';
+      });
+    }
+
+    // Render the AI's score for each column (called the instant it starts to
+    // think, when the board really is its move). The chosen column's ring is
+    // held back until showEvalPick() so you see it weigh, then decide.
+    function updateEvalOverlay() {
+      if (!evalEl) return;
+      nodeCount = 0;
+      const scores = scoreColumns();
+      lastMinimaxNodes = nodeCount; // this search is what picks the move
+      updateStatsPanel();
+      const playable = scores
+        .map((s, c) => ({ s, c }))
+        .filter((x): x is { s: number; c: number } => x.s !== null);
+      if (playable.length === 0) { clearEvalOverlay(); return; }
+      const bestScore = Math.max(...playable.map((x) => x.s));
+      evalPick = mostCentral(playable.filter((x) => x.s === bestScore).map((x) => x.c));
+
+      for (let c = 0; c < COLS; c++) {
+        const bar = evalBars[c];
+        const label = evalLabels[c];
+        const s = scores[c];
+        if (s === null) { // full column
+          bar.style.height = '0px';
+          bar.style.boxShadow = 'none';
+          label.textContent = '';
+          continue;
+        }
+        const mate = Math.abs(s) >= WIN_SCORE;
+        const f = mate ? Math.sign(s) : Math.max(-0.9, Math.min(0.9, s / EVAL_SCALE));
+        const mag = Math.max(0.06, Math.abs(f)); // always show a sliver
+        bar.style.height = `${mag * 50}%`;
+        bar.style.backgroundColor = f >= 0 ? '#22c55e' : '#ef4444';
+        if (f >= 0) { bar.style.bottom = '50%'; bar.style.top = ''; }
+        else { bar.style.top = '50%'; bar.style.bottom = ''; }
+        bar.style.boxShadow = 'none';
+        label.textContent = mate ? (s > 0 ? 'win' : 'loss') : '';
+      }
+    }
+
+    // Ring the column the AI settled on.
+    function showEvalPick() {
+      if (!busy || !evalEl || evalPick < 0) return; // reset mid-think
+
+      evalBars.forEach((bar, c) => {
+        bar.style.boxShadow = c === evalPick ? PICK_RING : 'none';
+      });
+    }
+
+    // ---- Controls panel (depth slider + node counter) -----------------------
+    let depthValEl: HTMLElement | null = null;
+    let statsEl: HTMLElement | null = null;
+    let lastMinimaxNodes = 0; // nodes the minimax board searched for its last move
+
+    function buildControlsPanel() {
+      if (!showNodeStats) return;
+      if (showControls) { // depth slider — alpha-beta only
+        const sliderRow = document.createElement('div');
+        sliderRow.className = 'flex items-center justify-center gap-3 text-sm text-gray-700';
+        const label = document.createElement('span');
+        label.className = 'font-medium';
+        label.textContent = 'Search depth';
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '1';
+        slider.max = '8';
+        slider.step = '1';
+        slider.value = String(maxDepth);
+        slider.className = 'w-40 accent-blue-700';
+        depthValEl = document.createElement('span');
+        depthValEl.className = 'font-mono w-6 text-center';
+        depthValEl.textContent = String(maxDepth);
+        slider.addEventListener('input', () => {
+          maxDepth = parseInt(slider.value, 10);
+          depthValEl!.textContent = String(maxDepth);
+        });
+        sliderRow.append(label, slider, depthValEl);
+        panelEl.append(sliderRow);
+      }
+
+      statsEl = document.createElement('div');
+      statsEl.className = 'text-xs text-gray-500 font-mono text-center mt-2 h-4';
+      panelEl.append(statsEl);
+    }
+
+    function updateStatsPanel() {
+      if (!statsEl) return;
+      if (strategy === 'alphabeta') {
+        const ab = lastABNodes.toLocaleString();
+        if (lastMMNodes === null) {
+          statsEl.textContent = `α-β: ${ab} positions · minimax: too many to run at depth ${maxDepth}`;
+        } else {
+          const pct = lastMMNodes > 0 ? Math.round((1 - lastABNodes / lastMMNodes) * 100) : 0;
+          statsEl.textContent = `α-β: ${ab} positions · minimax: ${lastMMNodes.toLocaleString()} — ${pct}% pruned`;
+        }
+      } else if (strategy === 'minimax') {
+        statsEl.textContent = `minimax searched ${lastMinimaxNodes.toLocaleString()} positions for that move`;
+      }
+    }
+
+    // ---- Solver worker ------------------------------------------------------
+    let worker: Worker | null = null;
+
+    function ensureWorker(): Worker {
+      if (!worker) {
+        const blob = new Blob([WORKER_SRC], { type: 'application/javascript' });
+        worker = new Worker(URL.createObjectURL(blob));
+      }
+      return worker;
+    }
+
+    // Send the current position to the worker and resolve with its chosen move.
+    function requestSolverMove(): Promise<SolveResult> {
+      return new Promise((resolve) => {
+        const w = ensureWorker();
+        const flat: number[] = [];
+        for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) flat.push(board[r][c]);
+        w.onmessage = (ev: MessageEvent) => resolve(ev.data as SolveResult);
+        w.postMessage({ board: flat, player: AI, budget: SOLVER_BUDGET });
+      });
+    }
+
+    // ---- Turn flow ----------------------------------------------------------
+
+    function humanMove(c: number) {
+      if (gameOver || busy) return;
+      const spot = place(c, HUMAN);
+      if (!spot) return; // column full
+
+      const line = winningLine(spot.r, spot.c, HUMAN);
+      if (line) {
+        winLine = line;
+        gameOver = true;
+      }
+      render(spot);
+
+      if (line) {
+        setStatus('You win! 🔴', 'text-red-600');
+        clearEvalOverlay();
+        scheduleWinHighlight(spot);
+        return;
+      }
+      if (isBoardFull()) {
+        gameOver = true;
+        setStatus("It's a draw.", 'text-gray-600');
+        clearEvalOverlay();
+        return;
+      }
+
+      beginAiTurn();
+    }
+
+    // Dispatch the AI's turn by strategy: the solver runs async in its worker;
+    // the eval board stages a visible "think"; everyone else just pauses briefly.
+    function beginAiTurn() {
+      busy = true;
+      if (strategy === 'solver') {
+        setStatus('AI is solving…', 'text-gray-500');
+        window.setTimeout(aiTurnSolver, 60); // let the status paint first
+        return;
+      }
+      setStatus('AI is thinking…', 'text-gray-500');
+      if (showEval) {
+        updateEvalOverlay();                       // bars rise
+        window.setTimeout(showEvalPick, 500);      // ring the chosen column
+        window.setTimeout(aiMove, 950);            // commit the move
+      } else {
+        window.setTimeout(aiMove, 450);
+      }
+    }
+
+    // Synchronous strategies (random / heuristic / minimax / alpha-beta).
+    function aiMove() {
+      if (!busy) return; // game was reset while we were "thinking"
+      const valid = validCols();
+      if (valid.length === 0) {
+        gameOver = true;
+        busy = false;
+        setStatus("It's a draw.", 'text-gray-600');
+        return;
+      }
+      // Reuse the move the overlay already computed and ringed, so the drop
+      // matches the highlight (and we don't search twice).
+      const col = showEval && evalPick >= 0 && dropRow(evalPick) >= 0 ? evalPick : chooseMove(valid);
+      if (showControls) updateStatsPanel();
+      applyAiMove(col);
+    }
+
+    // The perfect-play solver: open dead-centre instantly (no search needed),
+    // otherwise ask the worker for the move and surface when it's already won.
+    async function aiTurnSolver() {
+      if (!busy) return;
+      const valid = validCols();
+      if (valid.length === 0) {
+        gameOver = true; busy = false;
+        setStatus("It's a draw.", 'text-gray-600');
+        return;
+      }
+      let col: number;
+      let humanStatus = 'Your move — pick a column.';
+      if (stoneCount() === 0) {
+        col = 3; // first player's perfect opening
+      } else {
+        const res = await requestSolverMove();
+        if (!busy) return; // reset mid-solve
+        col = res.col >= 0 && dropRow(res.col) >= 0 ? res.col : valid[0];
+        if (res.mate && res.score > 0) humanStatus = 'The AI has a forced win. Your move anyway.';
+      }
+      if (!busy) return;
+      applyAiMove(col, humanStatus);
+    }
+
+    // Drop the AI's chosen piece and resolve the turn (win / draw / hand back).
+    function applyAiMove(col: number, humanStatus = 'Your move — pick a column.') {
+      const spot = place(col, AI)!;
+      const line = winningLine(spot.r, spot.c, AI);
+      if (line) {
+        winLine = line;
+        gameOver = true;
+      }
+      render(spot);
+      busy = false;
+
+      if (line) {
+        setStatus('AI wins. 🟡', 'text-yellow-600');
+        clearEvalOverlay();
+        scheduleWinHighlight(spot);
+        return;
+      }
+      if (isBoardFull()) {
+        gameOver = true;
+        setStatus("It's a draw.", 'text-gray-600');
+        clearEvalOverlay();
+        return;
+      }
+      setStatus(humanStatus, 'text-gray-700');
+      clearEvalOverlay(); // your turn — the AI isn't deliberating
+    }
+
+    function setStatus(text: string, colorClass: string) {
+      statusEl.textContent = text;
+      statusEl.className = `text-sm font-medium mb-3 h-5 ${colorClass}`;
+    }
+
+    // ---- Rendering & animation ---------------------------------------------
+
+    const inWinLine = (r: number, c: number): boolean =>
+      !!winLine && winLine.some((w) => w.r === r && w.c === c);
+
+    // Slide the just-dropped disc down from above the board into its slot,
+    // accelerating like a falling piece and giving a small squash on landing.
+    function animateDrop(disc: HTMLElement, cell: HTMLElement) {
+      const cellRect = cell.getBoundingClientRect();
+      const boardRect = boardEl.getBoundingClientRect();
+      const startY = -(cellRect.top - boardRect.top + cellRect.height);
+      const dur = Math.min(520, 180 + Math.abs(startY) * 0.9);
+      disc.style.transformOrigin = 'center bottom';
+      disc.animate(
+        [
+          { transform: `translateY(${startY}px)`, offset: 0, easing: 'cubic-bezier(0.5, 0, 0.85, 0.55)' },
+          { transform: 'translateY(0) scaleY(1)', offset: 0.7, easing: 'ease-out' },
+          { transform: 'translateY(0) scaleY(0.86)', offset: 0.82, easing: 'ease-in-out' },
+          { transform: 'translateY(0) scaleY(1)', offset: 1 },
+        ],
+        { duration: dur, fill: 'both' },
+      );
+    }
+
+    function render(lastDrop?: Cell) {
+      boardEl.innerHTML = '';
+      discEls = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+      const interactive = !gameOver && !busy;
+      let animTarget: { disc: HTMLElement; cell: HTMLElement } | null = null;
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = document.createElement('button');
+          cell.setAttribute('aria-label', `Column ${c + 1}`);
+          // The cell itself is the white "hole" punched in the blue board.
+          cell.className = 'relative aspect-square w-9 sm:w-11 rounded-full ' + (interactive ? 'cursor-pointer' : '');
+          cell.style.backgroundColor = '#ffffff';
+          cell.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.15)';
+
+          const v = board[r][c];
+          if (v !== 0) {
+            const disc = document.createElement('div');
+            // Discs paint on top of the holes above them as they fall through.
+            disc.className = 'absolute inset-0 rounded-full';
+            disc.style.backgroundColor = v === HUMAN ? '#ef4444' : '#f59e0b';
+            disc.style.boxShadow = DISC_SHADOW;
+            // Once a winner is decided, fade the pieces outside the winning line.
+            if (winLine && !inWinLine(r, c)) disc.style.opacity = '0.35';
+            cell.appendChild(disc);
+            discEls[r][c] = disc;
+            if (lastDrop && lastDrop.r === r && lastDrop.c === c) {
+              animTarget = { disc, cell };
+            }
+          }
+
+          cell.addEventListener('click', () => humanMove(c));
+          boardEl.appendChild(cell);
+        }
+      }
+
+      // Animate after the board is in the DOM so geometry can be measured.
+      if (animTarget) animateDrop(animTarget.disc, animTarget.cell);
+    }
+
+    // Wait for the winning piece to finish dropping, then light up the line.
+    function scheduleWinHighlight(lastDrop: Cell) {
+      const cell = discEls[lastDrop.r]?.[lastDrop.c]?.parentElement;
+      let delay = 360;
+      if (cell) {
+        const cellRect = cell.getBoundingClientRect();
+        const boardRect = boardEl.getBoundingClientRect();
+        const fall = cellRect.top - boardRect.top + cellRect.height;
+        delay = Math.min(520, 180 + fall * 0.9) + 40; // matches animateDrop timing
+      }
+      window.setTimeout(highlightWin, delay);
+    }
+
+    // Pop each winning disc in turn, then leave it glowing.
+    function highlightWin() {
+      if (!winLine) return;
+      winLine.forEach((cell, i) => {
+        const disc = discEls[cell.r]?.[cell.c];
+        if (!disc) return;
+        disc.style.zIndex = '5';
+        disc.animate(
+          [
+            { transform: 'scale(1)', boxShadow: `${DISC_SHADOW}, 0 0 0 0 rgba(255,255,255,0)` },
+            { transform: 'scale(1.18)', boxShadow: `${DISC_SHADOW}, 0 0 18px 6px rgba(255,255,255,0.95)` },
+            { transform: 'scale(1.08)', boxShadow: `${DISC_SHADOW}, 0 0 12px 4px rgba(255,255,255,0.85)` },
+          ],
+          { duration: 480, delay: i * 120, easing: 'ease-out', fill: 'forwards' },
+        );
+      });
+    }
+
+    buildEvalOverlay();
+    buildControlsPanel();
+    resetBtn.addEventListener('click', newGame);
+    newGame();
+  }
+
+  document.querySelectorAll<HTMLElement>('.c4-widget').forEach(initBoard);
+</script>
