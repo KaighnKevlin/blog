@@ -14,14 +14,15 @@ interface Props {
   showEval?: boolean;
   showControls?: boolean;
   aiFirst?: boolean;
+  title?: string;
   subtitle?: string;
 }
-const { ai = 'random', depth = 6, showEval = false, showControls = false, aiFirst = false, subtitle = 'you vs. random AI' } = Astro.props;
+const { ai = 'random', depth = 6, showEval = false, showControls = false, aiFirst = false, title = 'Connect 4', subtitle = 'you vs. random AI' } = Astro.props;
 ---
 
 <div class="c4-widget rounded-xl border border-gray-200 p-6 my-8 bg-white" data-ai={ai} data-depth={depth} data-eval={showEval ? '1' : undefined} data-controls={showControls ? '1' : undefined} data-aifirst={aiFirst ? '1' : undefined}>
   <div class="flex items-baseline justify-between mb-4">
-    <h3 class="text-lg font-semibold">Connect 4</h3>
+    <h3 class="text-lg font-semibold">{title}</h3>
     <span class="text-[10px] text-gray-400 uppercase tracking-wider font-mono">{subtitle}</span>
   </div>
 
