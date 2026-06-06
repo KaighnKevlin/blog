@@ -13,8 +13,11 @@ type Props = CollectionEntry<'blog'>;
 
 const post = Astro.props;
 const { Content } = await render(post);
+
+// Use the auto-generated title card unless the post supplies its own heroImage.
+const ogImagePath = post.data.heroImage ? undefined : `/og/${post.id}.png`;
 ---
 
-<BlogPost {...post.data}>
+<BlogPost {...post.data} ogImagePath={ogImagePath}>
 	<Content />
 </BlogPost>
