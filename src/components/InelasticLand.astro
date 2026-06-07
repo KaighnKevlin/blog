@@ -1,0 +1,132 @@
+---
+// Why land is the perfect thing to tax: supply is perfectly inelastic.
+// Slider rotates the supply curve from elastic (factory goods, where a tax
+// destroys trades -> big deadweight loss) to vertical (land, where a tax
+// changes nothing real -> zero deadweight loss, it just transfers rent from
+// the landowner to the public). Same fixed per-unit tax throughout.
+---
+
+<div class="il-widget rounded-xl border border-gray-200 p-6 my-8 bg-white">
+  <h3 class="text-lg font-semibold mb-1">Tax it and it doesn't disappear</h3>
+  <p class="text-sm text-gray-600 mb-4">
+    Same tax, different goods. When supply can shrink, a tax destroys trades that would have
+    happened — that lost value is <em>deadweight loss</em> (the shaded triangle). Drag from a
+    factory good toward land, whose supply can't shrink at all.
+  </p>
+
+  <input id="il-slope" type="range" min="0" max="100" step="1" value="10" class="w-full accent-[var(--accent)] mb-1" />
+  <div class="flex justify-between text-xs text-gray-500 mb-3">
+    <span>🚗 Elastic supply (factory goods)</span>
+    <span>🌍 Perfectly inelastic (land)</span>
+  </div>
+
+  <div class="flex flex-col sm:flex-row gap-4 items-center">
+    <svg id="il-svg" viewBox="0 0 320 240" class="w-full sm:w-2/3 border border-gray-100 rounded bg-white">
+      <!-- axes -->
+      <line x1="40" y1="10" x2="40" y2="210" stroke="#9ca3af" stroke-width="1.5" />
+      <line x1="40" y1="210" x2="310" y2="210" stroke="#9ca3af" stroke-width="1.5" />
+      <text x="20" y="16" font-size="10" fill="#6b7280">Price</text>
+      <text x="270" y="228" font-size="10" fill="#6b7280">Quantity</text>
+      <polygon id="il-dwl" points="" fill="#ef4444" fill-opacity="0.28" />
+      <line id="il-demand" stroke="#3b82f6" stroke-width="2" />
+      <line id="il-supply" stroke="#10b981" stroke-width="2" />
+      <line id="il-supply2" stroke="#10b981" stroke-width="2" stroke-dasharray="4 3" />
+      <line id="il-q0" stroke="#9ca3af" stroke-width="1" stroke-dasharray="2 3" />
+      <text x="150" y="60" font-size="9" fill="#3b82f6">Demand</text>
+      <text id="il-supply-label" font-size="9" fill="#10b981">Supply</text>
+    </svg>
+
+    <div class="w-full sm:w-1/3 text-sm">
+      <div class="text-xs uppercase text-gray-400">Deadweight loss</div>
+      <div class="h-3 bg-gray-100 rounded overflow-hidden my-1">
+        <div id="il-dwl-bar" class="h-full bg-red-500 transition-all" style="width:90%"></div>
+      </div>
+      <div id="il-dwl-val" class="font-mono text-red-500 font-semibold">high</div>
+      <p id="il-il-verdict" class="text-gray-600 mt-3 text-xs leading-relaxed"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Data coords: Q in [0,10], P in [0,10]. Demand: P = 9 - 0.7Q.
+  // Supply anchored through equilibrium E0 = (5, 5.5), slope s set by slider.
+  // Per-unit tax shifts supply up by T.
+  const T = 2;
+  const Q0 = 5, P0 = 5.5;
+
+  const slope = document.getElementById('il-slope') as HTMLInputElement;
+  const demand = document.getElementById('il-demand')!;
+  const supply = document.getElementById('il-supply')!;
+  const supply2 = document.getElementById('il-supply2')!;
+  const q0line = document.getElementById('il-q0')!;
+  const supplyLabel = document.getElementById('il-supply-label')!;
+  const dwl = document.getElementById('il-dwl')!;
+  const dwlBar = document.getElementById('il-dwl-bar')!;
+  const dwlVal = document.getElementById('il-dwl-val')!;
+  const verdict = document.getElementById('il-il-verdict')!;
+
+  // map data -> svg pixels
+  const X = (q: number) => 40 + (q / 10) * 260;
+  const Y = (p: number) => 210 - (p / 10) * 195;
+
+  function update() {
+    const v = Number(slope.value) / 100;
+    // theta from ~14deg (elastic) to ~89deg (vertical); slope s = tan(theta)
+    const theta = (14 + v * 75) * Math.PI / 180;
+    const s = Math.tan(theta);
+
+    // supply: P = P0 + s*(Q - Q0). draw across visible Q range.
+    const sx1 = 0, sy1 = P0 + s * (sx1 - Q0);
+    const sx2 = 10, sy2 = P0 + s * (sx2 - Q0);
+    supply.setAttribute('x1', String(X(sx1))); supply.setAttribute('y1', String(Y(sy1)));
+    supply.setAttribute('x2', String(X(sx2))); supply.setAttribute('y2', String(Y(sy2)));
+
+    // shifted (taxed) supply: P = P0 + T + s*(Q - Q0)
+    const ty1 = P0 + T + s * (sx1 - Q0), ty2 = P0 + T + s * (sx2 - Q0);
+    supply2.setAttribute('x1', String(X(sx1))); supply2.setAttribute('y1', String(Y(ty1)));
+    supply2.setAttribute('x2', String(X(sx2))); supply2.setAttribute('y2', String(Y(ty2)));
+
+    // demand line P = 9 - 0.7Q
+    demand.setAttribute('x1', String(X(0))); demand.setAttribute('y1', String(Y(9)));
+    demand.setAttribute('x2', String(X(10))); demand.setAttribute('y2', String(Y(9 - 7)));
+
+    // new equilibrium quantity after tax: Qt = (1.5 + 5s)/(s + 0.7)
+    const Qt = (1.5 + 5 * s) / (s + 0.7);
+    const Pt = 9 - 0.7 * Qt;           // price buyers pay
+    const Ps = Pt - T;                 // price sellers keep
+
+    // Q0 marker
+    q0line.setAttribute('x1', String(X(Q0))); q0line.setAttribute('y1', String(Y(0)));
+    q0line.setAttribute('x2', String(X(Q0))); q0line.setAttribute('y2', String(Y(P0)));
+
+    // DWL triangle: vertices at (Qt, Pt), (Qt, Ps), (Q0, P0)
+    const pts = `${X(Qt)},${Y(Pt)} ${X(Qt)},${Y(Ps)} ${X(Q0)},${Y(P0)}`;
+    dwl.setAttribute('points', pts);
+
+    supplyLabel.setAttribute('x', String(X(sx2) - 30));
+    supplyLabel.setAttribute('y', String(Math.max(20, Y(sy2) + 4)));
+
+    // DWL magnitude = 0.5 * T * (Q0 - Qt); max ~ at flattest supply
+    const loss = 0.5 * T * (Q0 - Qt);
+    const lossMax = 2.86;
+    const pct = Math.max(0, Math.min(100, (loss / lossMax) * 100));
+    dwlBar.style.width = pct + '%';
+
+    if (v > 0.93) {
+      dwlVal.textContent = 'ZERO';
+      dwlVal.className = 'font-mono text-emerald-600 font-semibold';
+      verdict.innerHTML = `<strong>This is land.</strong> The tax can't shrink the supply — the parcel is still there. So no trades are destroyed: the tax just moves money from the landowner's pocket to the public. Pure transfer, zero waste.`;
+    } else if (v > 0.55) {
+      dwlVal.textContent = 'small';
+      dwlVal.className = 'font-mono text-amber-600 font-semibold';
+      verdict.innerHTML = `Supply is fairly stiff. A tax shrinks output a little, so there's some waste — but most of the tax is still just a transfer.`;
+    } else {
+      dwlVal.textContent = 'large';
+      dwlVal.className = 'font-mono text-red-500 font-semibold';
+      verdict.innerHTML = `Supply responds strongly. Tax it and a lot of would-be production simply never happens — that whole red triangle is value nobody gets. Tax housing-on-a-lot, get less housing.`;
+    }
+  }
+
+  slope.addEventListener('input', update);
+  update();
+</script>

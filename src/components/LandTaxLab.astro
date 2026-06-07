@@ -1,0 +1,119 @@
+---
+// The Speculator's Math.
+// One prime Manhattan parcel. A split-rate slider trades off property tax
+// (taxes the BUILDING) against a land value tax (taxes the LAND, flat).
+// For each possible use we compute net annual profit; the most profitable
+// use is what a rational owner builds. Sliding from property tax -> LVT
+// flips the rational choice from parking lot -> mid-rise -> tower, and the
+// "homes built" counter jumps. Numbers are illustrative, not calibrated.
+---
+
+<div class="ltl-widget rounded-xl border border-gray-200 p-6 my-8 bg-white">
+  <h3 class="text-lg font-semibold mb-1">The speculator's math</h3>
+  <p class="text-sm text-gray-600 mb-4">
+    One prime downtown parcel, land worth <strong>$20M</strong>. You own it. What do you build?
+    Drag the slider to shift the tax from the <em>building</em> to the <em>land</em>, then watch
+    which use makes the most money — that's what a rational owner builds.
+  </p>
+
+  <label class="block mb-1">
+    <div class="flex justify-between text-sm mb-1">
+      <span>🏚️ 100% property tax<br /><span class="text-xs text-gray-500">(tax the building)</span></span>
+      <span class="text-right">100% land value tax 🏙️<br /><span class="text-xs text-gray-500">(tax the land)</span></span>
+    </div>
+    <input id="ltl-mix" type="range" min="0" max="100" step="1" value="0" class="w-full accent-[var(--accent)]" />
+    <div class="text-center text-xs text-gray-500 mt-1">
+      Tax mix: <strong id="ltl-mix-val" class="font-mono">100% property / 0% land</strong>
+    </div>
+  </label>
+
+  <div id="ltl-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4"></div>
+
+  <div id="ltl-verdict" class="mt-4 rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm"></div>
+
+  <p class="mt-3 text-xs text-gray-500 italic">
+    Property tax punishes you for building (bigger building → bigger bill), so sitting on a parking lot
+    is rational. A land value tax charges the same no matter what you build — so doing nothing gets
+    expensive, and the only way to cover the bill is to put the land to work. Magnitudes are illustrative.
+  </p>
+</div>
+
+<script>
+  type Use = {
+    key: string; emoji: string; name: string; homes: number;
+    cost: number;    // construction cost ($M), ≈ taxable building value
+    income: number;  // gross annual operating income before financing + tax ($M)
+  };
+
+  const CAP = 0.07;       // annual financing / opportunity cost on construction capital
+  const LAND = 20;        // land value ($M)
+  const BLDG_RATE = 0.05; // property-tax rate on building value
+  const LAND_RATE = 0.05; // land-tax rate on land value (flat -> $1.0M at full LVT)
+
+  const uses: Use[] = [
+    { key: 'lot',    emoji: '🅿️', name: 'Parking lot',     homes: 0,   cost: 0.5, income: 0.45 },
+    { key: 'house',  emoji: '🏠', name: 'Single-family',    homes: 1,   cost: 4,   income: 0.30 },
+    { key: 'midrise',emoji: '🏢', name: '6-story (40 homes)',homes: 40, cost: 18,  income: 2.30 },
+    { key: 'tower',  emoji: '🏙️', name: 'Tower (150 homes)', homes: 150, cost: 70,  income: 7.00 },
+  ];
+
+  const mix = document.getElementById('ltl-mix') as HTMLInputElement;
+  const mixVal = document.getElementById('ltl-mix-val')!;
+  const cardsEl = document.getElementById('ltl-cards')!;
+  const verdictEl = document.getElementById('ltl-verdict')!;
+
+  const fmt = (m: number) => {
+    const v = m * 1_000_000;
+    const sign = v < 0 ? '−' : '';
+    const abs = Math.abs(v);
+    return sign + '$' + (abs >= 1_000_000 ? (abs / 1_000_000).toFixed(2) + 'M' : Math.round(abs / 1000) + 'K');
+  };
+
+  function netFor(u: Use, t: number) {
+    const tax = (1 - t) * BLDG_RATE * u.cost + t * LAND_RATE * LAND;
+    const capital = CAP * u.cost;
+    return { tax, capital, net: u.income - capital - tax };
+  }
+
+  function update() {
+    const t = Number(mix.value) / 100;
+    mixVal.textContent = `${Math.round((1 - t) * 100)}% property / ${Math.round(t * 100)}% land`;
+
+    const results = uses.map((u) => ({ u, ...netFor(u, t) }));
+    const best = results.reduce((a, b) => (b.net > a.net ? b : a));
+
+    cardsEl.innerHTML = '';
+    results.forEach((r) => {
+      const winner = r.u.key === best.u.key;
+      const card = document.createElement('div');
+      card.className =
+        'rounded-lg border p-2 text-center transition-all ' +
+        (winner ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-400' : 'border-gray-200 bg-white');
+      const netColor = r.net >= 0 ? 'text-emerald-600' : 'text-red-500';
+      card.innerHTML = `
+        <div class="text-2xl leading-none mb-1">${r.u.emoji}</div>
+        <div class="text-[11px] font-medium leading-tight mb-1 h-7 flex items-center justify-center">${r.u.name}</div>
+        <div class="text-[10px] uppercase text-gray-400">profit / yr</div>
+        <div class="font-mono text-sm font-semibold ${netColor}">${fmt(r.net)}</div>
+        <div class="text-[10px] text-gray-500 mt-1">tax ${fmt(r.tax)}</div>
+        ${winner ? '<div class="text-[10px] font-semibold text-emerald-600 mt-1">✓ owner builds this</div>' : '<div class="h-[14px]"></div>'}
+      `;
+      cardsEl.appendChild(card);
+    });
+
+    const homes = best.u.homes;
+    const homeStr = homes === 0 ? 'zero homes' : homes === 1 ? '1 home' : `${homes} homes`;
+    let msg: string;
+    if (best.u.key === 'lot') {
+      msg = `A rational owner pockets the parking-lot cash and waits for the land to appreciate. <strong>The parcel houses ${homeStr}.</strong> Every other use loses money to the tax man.`;
+    } else if (best.u.key === 'tower') {
+      msg = `Sitting on a parking lot now <em>bleeds</em> ${fmt(Math.abs(netFor(uses[0], t).net))}/yr. The only way to cover the land bill is to build up. <strong>The parcel houses ${homeStr}.</strong>`;
+    } else {
+      msg = `The tax now punishes doing nothing more than it punishes building. The owner develops to the profitable maximum. <strong>The parcel houses ${homeStr}.</strong>`;
+    }
+    verdictEl.innerHTML = `🏘️ ${msg}`;
+  }
+
+  mix.addEventListener('input', update);
+  update();
+</script>
