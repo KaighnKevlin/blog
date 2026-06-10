@@ -56,29 +56,31 @@ const posts = (await getCollection('blog')).sort(
 			.title {
 				margin: 0;
 				color: rgb(var(--black));
-				line-height: 1;
+				line-height: 1.25;
 			}
 			.date {
-				margin: 0;
+				margin: 0.25em 0 0;
 				color: rgb(var(--gray));
+				font-size: 0.9em;
 			}
-			ul li a:hover h4,
+			ul li a:hover .title,
 			ul li a:hover .date {
-				color: rgb(var(--accent));
+				color: var(--accent);
 			}
 			ul a:hover img {
 				box-shadow: var(--box-shadow);
 			}
 			@media (max-width: 720px) {
 				ul {
-					gap: 0.5em;
+					gap: 1.75em;
 				}
 				ul li {
 					width: 100%;
-					text-align: center;
+					text-align: left;
 				}
 				ul li:first-child {
 					margin-bottom: 0;
+					text-align: left;
 				}
 				ul li:first-child .title {
 					font-size: 1.563em;

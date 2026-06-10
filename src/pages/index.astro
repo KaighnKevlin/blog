@@ -73,16 +73,21 @@ const posts = (await getCollection('blog'))
 </html>
 
 <style>
+	main {
+		width: 960px;
+	}
 	.hero {
-		padding: 2em 0 1em;
+		padding: 2em 0 2.5em;
 	}
 	.hero h1 {
-		font-size: 2.5em;
+		font-size: clamp(2rem, 4vw + 1rem, 2.5em);
 		margin-bottom: 0.25em;
 	}
 	.hero p {
-		font-size: 1.2em;
+		font-size: 1.15em;
 		color: rgb(var(--gray));
+		max-width: 36em;
+		margin-bottom: 0;
 	}
 	.section-header {
 		display: flex;
@@ -115,6 +120,10 @@ const posts = (await getCollection('blog'))
 	.post-list li img {
 		margin-bottom: 0.5rem;
 		border-radius: 12px;
+		transition: box-shadow 0.2s ease;
+	}
+	.post-list li a:hover img {
+		box-shadow: var(--box-shadow);
 	}
 	.title {
 		margin: 0;
@@ -141,10 +150,15 @@ const posts = (await getCollection('blog'))
 		border: 1px solid rgb(var(--gray-light));
 		border-radius: 12px;
 		text-decoration: none;
-		transition: box-shadow 0.2s ease;
+		transition:
+			box-shadow 0.2s ease,
+			transform 0.2s ease,
+			border-color 0.2s ease;
 	}
 	.project-card:hover {
-		box-shadow: var(--box-shadow);
+		box-shadow: 0 4px 16px rgba(var(--gray), 25%);
+		transform: translateY(-2px);
+		border-color: rgba(35, 55, 255, 0.35);
 	}
 	.project-card h4 {
 		margin: 0 0 0.5em;

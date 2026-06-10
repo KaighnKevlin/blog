@@ -17,9 +17,10 @@ const { title, description, pubDate, updatedDate, heroImage, ogImagePath } = Ast
 		<BaseHead title={title} description={description} image={heroImage} ogImagePath={ogImagePath} />
 		<style>
 			main {
-				width: calc(100% - 2em);
+				width: 100%;
 				max-width: 100%;
 				margin: 0;
+				padding: 0;
 			}
 			.hero-image {
 				width: 100%;
@@ -32,26 +33,44 @@ const { title, description, pubDate, updatedDate, heroImage, ogImagePath } = Ast
 			}
 			.prose {
 				width: 720px;
-				max-width: calc(100% - 2em);
+				max-width: 100%;
 				margin: auto;
-				padding: 1em;
+				padding: 2em 1em 3em;
 				color: rgb(var(--gray-dark));
 			}
 			.title {
-				margin-bottom: 1em;
-				padding: 1em 0;
+				margin-bottom: 1.5em;
+				padding: 1.5em 0 0;
 				text-align: center;
-				line-height: 1;
 			}
 			.title h1 {
 				margin: 0 0 0.5em 0;
 			}
+			.title hr {
+				margin: 1.5em auto 0;
+				width: 80px;
+				border-top: 3px solid var(--accent);
+				border-radius: 3px;
+			}
 			.date {
-				margin-bottom: 0.5em;
+				margin-bottom: 0.75em;
 				color: rgb(var(--gray));
+				font-size: 0.9em;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
 			}
 			.last-updated-on {
 				font-style: italic;
+				text-transform: none;
+				letter-spacing: normal;
+			}
+			@media (max-width: 720px) {
+				.prose {
+					padding: 1em 1em 2em;
+				}
+				.title {
+					padding-top: 0.75em;
+				}
 			}
 		</style>
 	</head>

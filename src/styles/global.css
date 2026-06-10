@@ -18,6 +18,9 @@
 		0 2px 6px rgba(var(--gray), 25%), 0 8px 24px rgba(var(--gray), 33%),
 		0 16px 32px rgba(var(--gray), 33%);
 }
+::selection {
+	background: rgba(35, 55, 255, 0.15);
+}
 @font-face {
 	font-family: "Atkinson";
 	src: url("/fonts/atkinson-regular.woff") format("woff");
@@ -39,11 +42,12 @@ body {
 	text-align: left;
 	background: linear-gradient(var(--gray-gradient)) no-repeat;
 	background-size: 100% 600px;
-	word-wrap: break-word;
 	overflow-wrap: break-word;
 	color: rgb(var(--gray-dark));
 	font-size: 20px;
 	line-height: 1.7;
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
 }
 main {
 	width: 720px;
@@ -60,21 +64,28 @@ h6 {
 	margin: 0 0 0.5rem 0;
 	color: rgb(var(--black));
 	line-height: 1.2;
+	/* Balance multi-line headings and hyphenate instead of breaking
+	   words at arbitrary points when they're too wide for the screen. */
+	text-wrap: balance;
+	hyphens: auto;
+	letter-spacing: -0.015em;
 }
+/* Fluid heading sizes: scale down smoothly on narrow screens so long
+   words fit without mid-word breaks. */
 h1 {
-	font-size: 3.052em;
+	font-size: clamp(1.9rem, 4.5vw + 1rem, 3rem);
 }
 h2 {
-	font-size: 2.441em;
+	font-size: clamp(1.55rem, 3vw + 0.9rem, 2.3rem);
 }
 h3 {
-	font-size: 1.953em;
+	font-size: clamp(1.3rem, 2vw + 0.85rem, 1.75rem);
 }
 h4 {
-	font-size: 1.563em;
+	font-size: clamp(1.15rem, 1.2vw + 0.85rem, 1.4rem);
 }
 h5 {
-	font-size: 1.25em;
+	font-size: 1.15rem;
 }
 strong,
 b {
@@ -82,15 +93,20 @@ b {
 }
 a {
 	color: var(--accent);
+	text-decoration-color: rgba(35, 55, 255, 0.3);
+	text-underline-offset: 3px;
+	transition: text-decoration-color 0.15s ease;
 }
 a:hover {
-	color: var(--accent);
+	color: var(--accent-dark);
+	text-decoration-color: currentColor;
 }
 p {
 	margin-bottom: 1em;
+	text-wrap: pretty;
 }
 .prose p {
-	margin-bottom: 2em;
+	margin-bottom: 1.5em;
 }
 .prose ul {
 	list-style: disc;
@@ -114,6 +130,12 @@ input {
 }
 table {
 	width: 100%;
+	border-collapse: collapse;
+}
+/* Let wide tables scroll instead of forcing the page wider on mobile. */
+.prose table {
+	display: block;
+	overflow-x: auto;
 }
 img {
 	max-width: 100%;
@@ -123,31 +145,37 @@ img {
 code {
 	padding: 2px 5px;
 	background-color: rgb(var(--gray-light));
-	border-radius: 2px;
+	border-radius: 4px;
+	font-size: 0.875em;
 }
 pre {
-	padding: 1.5em;
+	padding: 1.25em 1.5em;
 	border-radius: 8px;
+	overflow-x: auto;
+	font-size: 0.85em;
 }
 pre > code {
 	all: unset;
 }
 blockquote {
-	border-left: 4px solid var(--accent);
-	padding: 0 0 0 20px;
-	margin: 0;
-	font-size: 1.333em;
+	border-left: 3px solid var(--accent);
+	padding: 0.25em 0 0.25em 1em;
+	margin: 0 0 1.5em 0;
+	font-size: 1.1em;
+	font-style: italic;
+	color: rgba(var(--gray-dark), 0.85);
 }
 hr {
 	border: none;
 	border-top: 1px solid rgb(var(--gray-light));
+	margin: 2.5em 0;
 }
 @media (max-width: 720px) {
 	body {
-		font-size: 18px;
+		font-size: 17.5px;
 	}
 	main {
-		padding: 1em;
+		padding: 1.5em 1em;
 	}
 }
 
