@@ -1,0 +1,339 @@
+---
+import fs from 'node:fs';
+import path from 'node:path';
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE_TITLE, BUTTONDOWN_USERNAME } from '../consts';
+
+// Auto-load every web image in /public/onlykaighns/. These are git-ignored and
+// LOCAL ONLY (see .gitignore) — curate down to the keepers before any deploy.
+// To drop a photo from the page, just delete its file from public/onlykaighns/.
+const photoDir = path.join(process.cwd(), 'public', 'onlykaighns');
+let files: string[] = [];
+try {
+  files = fs.readdirSync(photoDir).filter((f) => /\.(jpe?g|png)$/i.test(f)).sort();
+} catch {}
+
+const CAPTIONS = [
+  'just woke up like this (i did not)',
+  'mirror selfie · server room edition 🔥',
+  'caught me at the whiteboard 🤓 spicy',
+  'collab w/ my foster cat (she has more fans)',
+  'gym? no. but i refactored a 600-line function',
+  'NYC golden hour. yes that is a bodega',
+  'me, eating a sandwich, aggressively',
+  'this one cost me $4.99 to post 🥵',
+  'POV: you matched with a Georgist',
+  'tax land. unrelated thirst trap',
+  'swipe right to upzone my heart',
+  'certified yapper · will explain minimax unprompted',
+  '6 figures of student debt but make it ✨confident✨',
+  'he can fix the housing crisis (he cannot)',
+  'down bad for inelastic supply',
+  'two truths and a lie: i go outside',
+];
+const TIERS = ['free', 'premium', 'free', 'whale', 'premium', 'free'];
+const tierBadge: Record<string, string> = {
+  free: 'bg-sky-100 text-sky-700',
+  premium: 'bg-fuchsia-100 text-fuchsia-700',
+  whale: 'bg-amber-100 text-amber-800',
+};
+
+const hasPhotos = files.length > 0;
+const photos = (hasPhotos ? files : Array.from({ length: 8 }, () => '')).map((f, i) => ({
+  src: f ? `/onlykaighns/${f}` : null,
+  file: f || `placeholder-${i + 1}`,
+  n: i + 1,
+  caption: CAPTIONS[i % CAPTIONS.length],
+  tier: TIERS[i % TIERS.length],
+}));
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead
+			title={`OnlyKaighns — ${SITE_TITLE}`}
+			description="The only fans you'll ever need. 100% organic, locally-sourced, free-range content."
+		/>
+	</head>
+	<body>
+		<Header />
+		<main class="!max-w-[860px] !w-[860px]">
+
+			<!-- ===== Local review banner (only shown when real photos are loaded) ===== -->
+			{import.meta.env.DEV && hasPhotos && (
+				<div class="rounded-xl border border-dashed border-amber-400 bg-amber-50 px-4 py-3 mb-5 text-sm flex flex-wrap items-center gap-x-3 gap-y-2">
+					<span class="font-semibold text-amber-800">🔒 Local curation mode</span>
+					<span class="text-amber-700">{photos.length} photos loaded · git-ignored, nothing is published.</span>
+					<button id="ok-review" class="ml-auto px-3 py-1 rounded-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors">
+						👀 Review mode: OFF
+					</button>
+				</div>
+			)}
+
+			<!-- ===== Profile header ===== -->
+			<div class="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm mb-6">
+				<div class="h-36 sm:h-44 bg-gradient-to-r from-sky-400 via-cyan-400 to-blue-500 relative">
+					<span class="absolute right-3 top-3 text-[11px] font-semibold bg-white/90 text-sky-600 px-2 py-0.5 rounded-full">
+						🟢 <span id="ok-online">4,206</span> fans online
+					</span>
+				</div>
+				<div class="px-5 pb-5">
+					<div class="-mt-12 mb-2 w-24 h-24 rounded-full border-4 border-white bg-gradient-to-br from-sky-300 to-blue-500 flex items-center justify-center text-4xl shadow overflow-hidden">
+						{photos[0]?.src ? <img src={photos[0].src} alt="avatar" class="w-full h-full object-cover" /> : '🧑‍💻'}
+					</div>
+					<div class="flex items-center gap-1.5">
+						<h1 class="text-2xl font-bold m-0">Kaighn</h1>
+						<svg viewBox="0 0 24 24" width="20" height="20" class="text-sky-500" fill="currentColor" aria-label="verified">
+							<path d="M12 1l2.4 2.1 3.2-.3 1 3 2.9 1.4-.9 3.1.9 3.1-2.9 1.4-1 3-3.2-.3L12 23l-2.4-2.1-3.2.3-1-3L2.5 14.8l.9-3.1-.9-3.1 2.9-1.4 1-3 3.2.3L12 1zm-1.2 13.9l5.3-5.3-1.4-1.4-3.9 3.9-1.8-1.8-1.4 1.4 3.2 3.2z"/>
+						</svg>
+					</div>
+					<p class="text-gray-500 text-sm m-0">@onlykaighns</p>
+					<p class="text-[15px] mt-3 mb-3">
+						SWE by day. SWE by night. NYC 🗽 · he/him · 100% organic, locally-sourced content.
+						Not financial advice. Definitely not.
+					</p>
+					<div class="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+						<span><strong id="ok-subs" class="font-mono">1,200,431</strong> <span class="text-gray-500">fans</span></span>
+						<span><strong class="font-mono">{photos.length}</strong> <span class="text-gray-500">posts</span></span>
+						<span><strong class="font-mono">42.0M</strong> <span class="text-gray-500">likes</span></span>
+						<span class="text-emerald-600 font-semibold">Top 0.01% 🏆</span>
+					</div>
+				</div>
+			</div>
+
+			<!-- ===== Subscribe / unlock bar ===== -->
+			<div id="ok-paywall" class="rounded-2xl border-2 border-sky-300 bg-sky-50 p-5 mb-6 text-center">
+				<div class="text-lg font-bold">Subscribe to unlock all content 🔒</div>
+				<div class="text-sm text-gray-600 mb-3">
+					<span class="line-through">$4.99 / month</span> &nbsp;→&nbsp;
+					<span class="font-semibold text-sky-600">actually free, I just want your email lol</span>
+				</div>
+				<form id="ok-form" class="flex flex-col sm:flex-row gap-2 justify-center max-w-md mx-auto"
+					action={`https://buttondown.com/api/emails/embed-subscribe/${BUTTONDOWN_USERNAME}`}
+					method="post" target="popupwindow">
+					<input type="email" name="email" required placeholder="you@example.com"
+						class="flex-1 px-3 py-2 rounded-lg border border-sky-300 text-base" />
+					<button type="submit"
+						class="px-5 py-2 rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-semibold transition-colors">
+						Subscribe 💙
+					</button>
+				</form>
+				<div class="mt-3">
+					<button id="ok-sample-btn"
+						class="px-4 py-1.5 rounded-full border border-sky-400 text-sky-600 text-sm font-semibold hover:bg-sky-100 transition-colors">
+						🎁 Show me a free sample
+					</button>
+				</div>
+				<button id="ok-peek" class="mt-3 text-xs text-gray-500 underline hover:text-gray-700">
+					no thanks, just let me peek (it's free, I'm not a real business)
+				</button>
+			</div>
+
+			<!-- ===== Free sample lightbox ===== -->
+			<div id="ok-sample" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+				<div class="relative max-w-sm w-full">
+					<button id="ok-sample-close" aria-label="close"
+						class="absolute -top-3 -right-3 w-9 h-9 rounded-full bg-white text-gray-800 text-lg font-bold shadow-lg hover:bg-gray-100">✕</button>
+					<img src="/onlykaighns/img-2215.jpg" alt="free sample" class="w-full rounded-xl shadow-2xl" />
+					<p class="text-center text-white text-sm mt-3 italic px-2">
+						Your free sample 😍 — me, post-Burning Man, after an 8-hour overnight drive.
+						Imagine what the <span class="font-semibold">paid</span> tier looks like.
+					</p>
+				</div>
+			</div>
+
+			<!-- ===== Feed ===== -->
+			<div id="ok-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-10">
+				{photos.map((p) => (
+					<div class="ok-tile relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100 aspect-[3/4]" data-file={p.file}>
+						{p.src
+							? <img src={p.src} alt={p.file} loading="lazy" class="ok-img w-full h-full object-cover blur-xl scale-105 transition" />
+							: <div class="ok-img w-full h-full blur-xl scale-105 transition flex items-center justify-center text-5xl"
+									style={`background: linear-gradient(135deg, hsl(${(p.n * 47) % 360} 70% 75%), hsl(${(p.n * 47 + 60) % 360} 70% 60%))`}>📸</div>
+						}
+						<span class="ok-num hidden absolute left-1.5 top-1.5 z-10 text-[11px] font-bold font-mono bg-black/75 text-white px-1.5 py-0.5 rounded">#{p.n}</span>
+						<span class="ok-reject-mark">✗</span>
+						<div class="ok-lock absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/25 backdrop-blur-[1px] text-white">
+							<span class="text-2xl">🔒</span>
+							<span class="text-[11px] font-semibold px-2 text-center">tap subscribe to unlock</span>
+						</div>
+						<div class="ok-caption absolute bottom-0 inset-x-0 p-2 text-[11px] text-white bg-gradient-to-t from-black/80 to-transparent opacity-0 transition-opacity">
+							<span class={`inline-block mb-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase ${tierBadge[p.tier]}`}>{p.tier}</span>
+							<div>{p.caption}</div>
+							<div class="ok-file hidden font-mono text-[9px] text-amber-200 mt-0.5">#{p.n} · {p.file}</div>
+						</div>
+					</div>
+				))}
+			</div>
+
+			{/* Local curation toolbar — dev only, never shipped to production */}
+			{import.meta.env.DEV && (
+			<div id="ok-toolbar" class="hidden sticky bottom-3 z-20 rounded-xl border border-amber-400 bg-white/95 backdrop-blur shadow-lg p-3 mb-8">
+				<div class="flex flex-wrap items-center gap-3 text-sm">
+					<span class="font-semibold text-amber-800">Cull mode</span>
+					<span class="text-gray-600">click a photo to mark it ✗ — <strong id="ok-reject-count">0</strong> rejected, <strong id="ok-keep-count">0</strong> keeping</span>
+					<button id="ok-copy" class="ml-auto px-3 py-1 rounded-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold">📋 Copy reject list</button>
+					<button id="ok-clear" class="px-3 py-1 rounded-full border border-gray-300 text-gray-600 text-xs font-semibold hover:bg-gray-50">Clear</button>
+				</div>
+				<textarea id="ok-rejects" readonly placeholder="Rejected photos will appear here — paste this back to me, or hit Copy."
+					class="mt-2 w-full h-20 text-[11px] font-mono rounded border border-gray-200 p-2 bg-gray-50"></textarea>
+			</div>
+			)}
+
+			<!-- ===== Tip jar ===== -->
+			<div class="text-center mb-12">
+				<button id="ok-tip"
+					class="px-5 py-2 rounded-full border border-amber-300 bg-amber-50 text-amber-800 font-semibold hover:bg-amber-100 transition-colors">
+					💸 Send a tip
+				</button>
+				<p class="text-xs text-gray-400 mt-2">0% of proceeds go to me, because there are no proceeds.</p>
+			</div>
+
+		</main>
+		<Footer />
+
+		<style is:global>
+			.ok-tile.ok-unlocked .ok-img { filter: none; transform: none; }
+			.ok-tile.ok-unlocked .ok-lock { display: none; }
+			.ok-tile.ok-unlocked:hover .ok-caption { opacity: 1; }
+			/* Review mode: reveal everything + show numbers/filenames for curation */
+			#ok-grid.ok-review .ok-img { filter: none; transform: none; }
+			#ok-grid.ok-review .ok-lock { display: none; }
+			#ok-grid.ok-review .ok-num { display: block; }
+			#ok-grid.ok-review .ok-caption { opacity: 1; }
+			#ok-grid.ok-review .ok-file { display: block; }
+			#ok-grid.ok-review .ok-tile { cursor: pointer; }
+			/* Rejected tiles in cull mode */
+			#ok-grid.ok-review .ok-tile.ok-reject { outline: 4px solid #ef4444; outline-offset: -4px; }
+			#ok-grid.ok-review .ok-tile.ok-reject .ok-img { filter: grayscale(1) brightness(0.5); }
+			.ok-reject-mark { display: none; }
+			#ok-grid.ok-review .ok-tile.ok-reject .ok-reject-mark {
+				display: flex; position: absolute; inset: 0; z-index: 20;
+				align-items: center; justify-content: center;
+				font-size: 3rem; color: #ef4444; text-shadow: 0 1px 6px rgba(0,0,0,.6);
+			}
+		</style>
+
+		<script>
+			// Randomize the feed on every page load, but always keep this photo
+			// in one of positions 3–5 (it's a good one).
+			const PIN_FILE = 'img-2215.jpg';
+			(function shuffleFeed() {
+				const g = document.getElementById('ok-grid');
+				if (!g) return;
+				const items = Array.from(g.children) as HTMLElement[];
+				for (let i = items.length - 1; i > 0; i--) {
+					const j = Math.floor(Math.random() * (i + 1));
+					[items[i], items[j]] = [items[j], items[i]];
+				}
+				const pinIdx = items.findIndex((el) => (el.dataset.file || '') === PIN_FILE);
+				if (pinIdx !== -1) {
+					const [pinned] = items.splice(pinIdx, 1);
+					// target 0-based index 2,3,4  -> 1-based position 3,4,5
+					const target = Math.min(2 + Math.floor(Math.random() * 3), items.length);
+					items.splice(target, 0, pinned);
+				}
+				items.forEach((el) => g.appendChild(el));
+			})();
+
+			function unlock() {
+				document.querySelectorAll('.ok-tile').forEach((t, i) => {
+					setTimeout(() => t.classList.add('ok-unlocked'), i * 60);
+				});
+				const pw = document.getElementById('ok-paywall');
+				if (pw) {
+					pw.innerHTML =
+						'<div class="text-lg font-bold text-sky-600">You’re in 💙</div>' +
+						'<div class="text-sm text-gray-600">Welcome to the top 0.01% of fans. The content was free the whole time. The real OnlyFans was the friends we made along the way.</div>';
+				}
+			}
+			document.getElementById('ok-peek')?.addEventListener('click', unlock);
+
+			// Free sample lightbox (the terrible one)
+			const sampleModal = document.getElementById('ok-sample');
+			const closeSample = () => sampleModal?.classList.add('hidden');
+			document.getElementById('ok-sample-btn')?.addEventListener('click', () => sampleModal?.classList.remove('hidden'));
+			document.getElementById('ok-sample-close')?.addEventListener('click', closeSample);
+			sampleModal?.addEventListener('click', (e) => { if (e.target === sampleModal) closeSample(); });
+			document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSample(); });
+			document.getElementById('ok-form')?.addEventListener('submit', () => setTimeout(unlock, 50));
+
+			// Review / cull mode (local curation): unblur all, show #/filenames,
+			// click a tile to mark it rejected, copy the list to paste back.
+			const reviewBtn = document.getElementById('ok-review');
+			const grid = document.getElementById('ok-grid');
+			const toolbar = document.getElementById('ok-toolbar');
+			const rejectsBox = document.getElementById('ok-rejects') as HTMLTextAreaElement | null;
+			const rejectCountEl = document.getElementById('ok-reject-count');
+			const keepCountEl = document.getElementById('ok-keep-count');
+			const tiles = Array.from(document.querySelectorAll('.ok-tile')) as HTMLElement[];
+			const LS_KEY = 'onlykaighns-rejects';
+
+			function loadRejects(): Set<string> {
+				try { return new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]')); } catch { return new Set(); }
+			}
+			function saveRejects(s: Set<string>) {
+				localStorage.setItem(LS_KEY, JSON.stringify([...s]));
+			}
+			function refresh() {
+				const rejected = tiles.filter((t) => t.classList.contains('ok-reject'));
+				const files = rejected.map((t) => t.dataset.file || '');
+				if (rejectCountEl) rejectCountEl.textContent = String(rejected.length);
+				if (keepCountEl) keepCountEl.textContent = String(tiles.length - rejected.length);
+				if (rejectsBox) rejectsBox.value = files.length
+					? 'DELETE these ' + files.length + ' files:\n' + files.join('\n')
+					: '';
+			}
+
+			// restore prior selections
+			const saved = loadRejects();
+			tiles.forEach((t) => { if (saved.has(t.dataset.file || '')) t.classList.add('ok-reject'); });
+
+			reviewBtn?.addEventListener('click', () => {
+				const on = grid?.classList.toggle('ok-review');
+				reviewBtn.textContent = on ? '👀 Review mode: ON' : '👀 Review mode: OFF';
+				toolbar?.classList.toggle('hidden', !on);
+				if (on) refresh();
+			});
+			grid?.addEventListener('click', (e) => {
+				if (!grid.classList.contains('ok-review')) return; // normal gag when not culling
+				const tile = (e.target as HTMLElement).closest('.ok-tile') as HTMLElement | null;
+				if (!tile) return;
+				tile.classList.toggle('ok-reject');
+				const s = loadRejects();
+				const f = tile.dataset.file || '';
+				tile.classList.contains('ok-reject') ? s.add(f) : s.delete(f);
+				saveRejects(s);
+				refresh();
+			});
+			document.getElementById('ok-copy')?.addEventListener('click', () => {
+				if (rejectsBox) { rejectsBox.select(); navigator.clipboard?.writeText(rejectsBox.value); }
+				const b = document.getElementById('ok-copy')!; const t = b.textContent;
+				b.textContent = '✓ Copied'; setTimeout(() => (b.textContent = t), 1200);
+			});
+			document.getElementById('ok-clear')?.addEventListener('click', () => {
+				tiles.forEach((t) => t.classList.remove('ok-reject'));
+				saveRejects(new Set()); refresh();
+			});
+			refresh();
+
+			document.getElementById('ok-tip')?.addEventListener('click', () => {
+				alert('Tip received 💸 Karmic balance restored. You will be remembered.');
+			});
+
+			// fake live counters
+			const subsEl = document.getElementById('ok-subs');
+			const onlineEl = document.getElementById('ok-online');
+			let subs = 1200431, online = 4206;
+			setInterval(() => {
+				subs += Math.floor(Math.random() * 7);
+				online += Math.floor(Math.random() * 11) - 5;
+				if (subsEl) subsEl.textContent = subs.toLocaleString();
+				if (onlineEl) onlineEl.textContent = Math.max(1, online).toLocaleString();
+			}, 1500);
+		</script>
+	</body>
+</html>

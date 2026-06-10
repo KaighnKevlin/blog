@@ -25,3 +25,10 @@ pnpm-debug.log*
 
 # local binaries
 cloudflared
+
+# OnlyKaighns photos — LOCAL ONLY. Do not commit until curated + approved for public.
+public/onlykaighns/*.jpg
+public/onlykaighns/*.jpeg
+public/onlykaighns/*.png
+public/onlykaighns/*.gif
+public/onlykaighns/*.heic

@@ -16,5 +16,11 @@
     "description": "An indie game blending Terraria's exploration, Factorio's automation, and tower defense strategy. Work in progress in Godot 4.",
     "url": "#",
     "tags": ["Godot", "Game Dev", "Indie"]
+  },
+  {
+    "title": "OnlyKaighns",
+    "description": "A parody of OnlyFans where the exclusive content is just a wall of photos of me. Subscribe to unlock everything (it's free, I just want your email).",
+    "url": "/onlykaighns/",
+    "tags": ["Parody", "Web", "Cursed"]
   }
 ]
