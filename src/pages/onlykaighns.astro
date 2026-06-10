@@ -82,7 +82,7 @@ const photos = (hasPhotos ? files : Array.from({ length: 8 }, () => '')).map((f,
 				</div>
 				<div class="px-5 pb-5">
 					<div class="relative z-10 -mt-12 mb-2 w-24 h-24 rounded-full border-4 border-white bg-gradient-to-br from-sky-300 to-blue-500 flex items-center justify-center text-4xl shadow overflow-hidden">
-						{photos[0]?.src ? <img src={photos[0].src} alt="avatar" class="w-full h-full object-cover" /> : '🧑‍💻'}
+						{photos[0]?.src ? <img id="ok-avatar" src={photos[0].src} alt="avatar" class="w-full h-full object-cover" /> : '🧑‍💻'}
 					</div>
 					<div class="flex items-center gap-1.5">
 						<h1 class="text-2xl font-bold m-0">Kaighn</h1>
@@ -237,6 +237,14 @@ const photos = (hasPhotos ? files : Array.from({ length: 8 }, () => '')).map((f,
 					items.splice(target, 0, pinned);
 				}
 				items.forEach((el) => g.appendChild(el));
+
+				// Random avatar each load too
+				const avatar = document.getElementById('ok-avatar');
+				const imgs = Array.from(g.querySelectorAll('.ok-tile img')) as HTMLImageElement[];
+				if (avatar && imgs.length) {
+					const pick = imgs[Math.floor(Math.random() * imgs.length)];
+					avatar.setAttribute('src', pick.getAttribute('src') || '');
+				}
 			})();
 
 			function unlock() {
