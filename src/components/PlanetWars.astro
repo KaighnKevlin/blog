@@ -1,0 +1,536 @@
+---
+// Playable Galcon-like ("Planet Wars"). Circles are planets; owned planets
+// produce troops over time (bigger = faster). Click/tap one of your planets,
+// then a target, to send half its garrison. Capture everything to win.
+// The opponent's strategy is chosen per-instance via the `ai` prop so the
+// post can ladder up difficulty, Connect-4-style:
+//   "random" — fires half-stacks at random planets (comically bad baseline)
+//   "greedy" — expands to the cheapest affordable neutral, then attacks
+//   "smart"  — counts in-flight fleets, rescues threatened planets, weighs
+//              production/cost/distance, consolidates rear garrisons forward
+// The script initialises every .pw-widget on the page independently.
+interface Props {
+  ai?: 'random' | 'greedy' | 'smart';
+  title?: string;
+  subtitle?: string;
+}
+const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = Astro.props;
+---
+
+<div class="pw-widget rounded-xl border border-gray-200 p-5 sm:p-6 my-8 bg-white select-none" data-ai={ai}>
+  <div class="flex items-baseline justify-between mb-3">
+    <h3 class="text-lg font-semibold">{title}</h3>
+    <span class="text-[10px] text-gray-400 uppercase tracking-wider font-mono">{subtitle}</span>
+  </div>
+
+  <div class="flex items-center gap-3 mb-3 font-mono text-xs">
+    <span data-pw="pcount" class="w-12 text-right font-bold text-indigo-600">—</span>
+    <div class="flex h-1.5 flex-1 overflow-hidden rounded-full bg-gray-200">
+      <div data-pw="pbar" class="h-full rounded-r-full bg-indigo-500" style="width: 8%; transition: width 0.5s ease"></div>
+      <div class="h-full flex-1"></div>
+      <div data-pw="ebar" class="h-full rounded-l-full bg-rose-500" style="width: 8%; transition: width 0.5s ease"></div>
+    </div>
+    <span data-pw="ecount" class="w-12 font-bold text-rose-500">—</span>
+  </div>
+
+  <div class="relative">
+    <canvas data-pw="canvas" class="block w-full rounded-lg" style="touch-action: none; background: #f8fafc"></canvas>
+    <div data-pw="overlay" class="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-lg bg-white/60 backdrop-blur-[2px]">
+      <div data-pw="msg" class="text-base font-semibold text-gray-800"></div>
+      <button data-pw="play" class="rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700">
+        Play
+      </button>
+    </div>
+  </div>
+
+  <div class="mt-3 flex items-center justify-between gap-3 text-[11px] text-gray-400">
+    <span>
+      <span class="mr-2 inline-flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-indigo-500"></span>you</span>
+      <span class="mr-2 inline-flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-rose-500"></span>them</span>
+      tap a planet, then a target — sends half · double-tap selects all · drag works too
+    </span>
+    <button data-pw="reset" class="shrink-0 rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50">
+      New game
+    </button>
+  </div>
+</div>
+
+<script>
+  type Owner = 0 | 1 | 2; // neutral | you | enemy
+  interface Planet {
+    x: number; // normalized: x in [0,1], y in [0,ASPECT], r in width units
+    y: number;
+    r: number;
+    owner: Owner;
+    troops: number;
+    prod: number; // troops per second while owned
+  }
+  interface Fleet {
+    from: number;
+    to: number;
+    owner: Owner;
+    count: number;
+    t: number; // progress 0..1
+    dur: number; // seconds for the full trip
+  }
+
+  const ASPECT = 0.62; // canvas height / width; all map coords live in this box
+  const SPEED = 0.17; // fleet speed in width-units per second
+  const CAP = 500; // garrison cap, keeps labels sane
+  const PROD_K = 46; // prod = radius * PROD_K
+  const COLOR: Record<number, string> = { 1: '#6366f1', 2: '#f43f5e' };
+  const GLOW: Record<number, string> = { 1: 'rgba(99,102,241,0.45)', 2: 'rgba(244,63,94,0.45)' };
+  const AI_INTERVAL: Record<string, number> = { random: 1.6, greedy: 1.25, smart: 0.85 };
+
+  document.querySelectorAll<HTMLElement>('.pw-widget').forEach(initWidget);
+
+  function initWidget(root: HTMLElement) {
+    const $ = (k: string) => root.querySelector(`[data-pw="${k}"]`) as HTMLElement;
+    const canvas = $('canvas') as unknown as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d')!;
+    const overlay = $('overlay');
+    const msgEl = $('msg');
+    const aiKind = root.dataset.ai || 'smart';
+
+    let planets: Planet[] = [];
+    let fleets: Fleet[] = [];
+    let state: 'idle' | 'running' | 'over' = 'idle';
+    let W = 300; // CSS pixel width of the canvas
+    let elapsed = 0;
+    let aiTimer = 0;
+    let last = 0;
+    let raf = 0;
+
+    // --- input state ---
+    const selection = new Set<number>();
+    let downPlanet = -1;
+    let downX = 0;
+    let downY = 0;
+    let dragging = false;
+    let hoverPlanet = -1;
+    let pointerX = 0;
+    let pointerY = 0;
+    let pointerIn = false;
+    let lastTap = { i: -1, t: 0 };
+
+    // ---------- map generation (point-symmetric so neither side is favored) ----------
+    function genMap() {
+      const ps: Planet[] = [];
+      const fits = (x: number, y: number, r: number) =>
+        x > r + 0.02 && x < 1 - r - 0.02 && y > r + 0.02 && y < ASPECT - r - 0.02 &&
+        ps.every((q) => Math.hypot(q.x - x, q.y - y) > q.r + r + 0.035);
+
+      ps.push({ x: 0.1, y: ASPECT / 2, r: 0.042, owner: 1, troops: 25, prod: 0 });
+      ps.push({ x: 0.9, y: ASPECT / 2, r: 0.042, owner: 2, troops: 25, prod: 0 });
+      // Sometimes a fat contested planet in the dead center.
+      if (Math.random() < 0.5) ps.push({ x: 0.5, y: ASPECT / 2, r: 0.052, owner: 0, troops: 45, prod: 0 });
+
+      let pairs = 0;
+      for (let tries = 0; pairs < 4 && tries < 500; tries++) {
+        const r = 0.022 + Math.random() * 0.024;
+        const x = 0.07 + Math.random() * 0.41;
+        const y = 0.06 + Math.random() * (ASPECT - 0.12);
+        const mx = 1 - x;
+        const my = ASPECT - y;
+        if (!fits(x, y, r)) continue;
+        if (Math.hypot(mx - x, my - y) <= 2 * r + 0.035) continue; // mirror twin too close
+        const troops = Math.round(r * 520 * (0.7 + Math.random() * 0.8));
+        ps.push({ x, y, r, owner: 0, troops, prod: 0 });
+        if (!fits(mx, my, r)) { ps.pop(); continue; }
+        ps.push({ x: mx, y: my, r, owner: 0, troops, prod: 0 });
+        pairs++;
+      }
+      for (const p of ps) p.prod = p.r * PROD_K;
+      return ps;
+    }
+
+    function reset(autostart: boolean) {
+      planets = genMap();
+      fleets = [];
+      selection.clear();
+      elapsed = 0;
+      aiTimer = 0;
+      if (autostart) {
+        state = 'running';
+        overlay.style.display = 'none';
+      } else {
+        state = 'idle';
+        msgEl.textContent = '';
+        ($('play') as HTMLElement).textContent = 'Play';
+        overlay.style.display = 'flex';
+      }
+      updateHud();
+      draw();
+    }
+
+    // ---------- core mechanics ----------
+    const dist = (a: Planet, b: Planet) => Math.hypot(a.x - b.x, a.y - b.y);
+
+    function send(sources: number[], dst: number) {
+      for (const s of new Set(sources)) {
+        if (s === dst) continue;
+        const p = planets[s];
+        const n = Math.floor(p.troops / 2);
+        if (n < 1) continue;
+        p.troops -= n;
+        fleets.push({ from: s, to: dst, owner: p.owner, count: n, t: 0, dur: dist(p, planets[dst]) / SPEED });
+      }
+    }
+
+    function update(dt: number) {
+      elapsed += dt;
+      for (const p of planets) if (p.owner !== 0) p.troops = Math.min(CAP, p.troops + p.prod * dt);
+
+      for (let i = fleets.length - 1; i >= 0; i--) {
+        const f = fleets[i];
+        f.t += dt / f.dur;
+        if (f.t < 1) continue;
+        const q = planets[f.to];
+        if (q.owner === f.owner) {
+          q.troops = Math.min(CAP, q.troops + f.count);
+        } else {
+          q.troops -= f.count;
+          if (q.troops < 0) {
+            q.owner = f.owner;
+            q.troops = -q.troops;
+            selection.delete(f.to);
+          }
+        }
+        fleets.splice(i, 1);
+      }
+
+      aiTimer += dt;
+      if (aiTimer >= AI_INTERVAL[aiKind]) {
+        aiTimer = 0;
+        aiTick();
+      }
+
+      const alive = (o: Owner) => planets.some((p) => p.owner === o) || fleets.some((f) => f.owner === o);
+      if (!alive(1) || !alive(2)) endGame(alive(1));
+    }
+
+    function endGame(won: boolean) {
+      state = 'over';
+      msgEl.textContent = won ? 'You conquered the system 🪐' : 'Your empire fell 💀';
+      ($('play') as HTMLElement).textContent = 'Play again';
+      overlay.style.display = 'flex';
+    }
+
+    // ---------- AI ----------
+    // Troops already in flight toward each planet, per side.
+    function incoming() {
+      const inc1 = planets.map(() => 0);
+      const inc2 = planets.map(() => 0);
+      for (const f of fleets) (f.owner === 1 ? inc1 : inc2)[f.to] += f.count;
+      return { inc1, inc2 };
+    }
+
+    function aiTick() {
+      const mine = planets.map((_, i) => i).filter((i) => planets[i].owner === 2);
+      if (!mine.length) return;
+      if (aiKind === 'random') return aiRandom(mine);
+      if (aiKind === 'greedy') return aiGreedy(mine);
+      aiSmart(mine);
+    }
+
+    function aiRandom(mine: number[]) {
+      if (Math.random() > 0.7) return;
+      const src = mine[Math.floor(Math.random() * mine.length)];
+      if (planets[src].troops < 8) return;
+      let dst = Math.floor(Math.random() * planets.length);
+      if (dst === src) dst = (dst + 1) % planets.length;
+      send([src], dst);
+    }
+
+    function aiGreedy(mine: number[]) {
+      const src = mine.reduce((a, b) => (planets[a].troops >= planets[b].troops ? a : b));
+      const half = Math.floor(planets[src].troops / 2);
+      if (half < 2) return;
+      // Cheapest-then-nearest affordable neutral; otherwise mug the weakest player planet.
+      const neutrals = planets
+        .map((_, i) => i)
+        .filter((i) => planets[i].owner === 0 && planets[i].troops + 1 <= half)
+        .sort((a, b) => planets[a].troops - planets[b].troops || dist(planets[src], planets[a]) - dist(planets[src], planets[b]));
+      if (neutrals.length) return send([src], neutrals[0]);
+      if (half < 20) return;
+      const targets = planets.map((_, i) => i).filter((i) => planets[i].owner === 1);
+      if (!targets.length) return;
+      send([src], targets.reduce((a, b) => (planets[a].troops <= planets[b].troops ? a : b)));
+    }
+
+    function aiSmart(mine: number[]) {
+      const { inc1, inc2 } = incoming();
+
+      // 1. Rescue: a planet about to fall gets half the nearest healthy garrison.
+      for (const m of mine) {
+        if (planets[m].troops + inc2[m] - inc1[m] >= -1) continue;
+        const helpers = mine
+          .filter((o) => o !== m && planets[o].troops > 10)
+          .sort((a, b) => dist(planets[a], planets[m]) - dist(planets[b], planets[m]));
+        if (helpers.length) return send([helpers[0]], m);
+      }
+
+      // 2. Attack the best production-per-cost target we can actually take.
+      const aggro = elapsed > 45 ? 1.4 : 0.75; // expand first, fight later
+      let best: { s: number; q: number; score: number } | null = null;
+      for (const s of mine) {
+        const half = Math.floor(planets[s].troops / 2);
+        if (half < 5) continue;
+        for (let q = 0; q < planets.length; q++) {
+          if (planets[q].owner === 2) continue;
+          const d = dist(planets[s], planets[q]);
+          const need =
+            planets[q].owner === 0
+              ? planets[q].troops - inc2[q] + inc1[q] + 1
+              : planets[q].troops + planets[q].prod * (d / SPEED) + inc1[q] - inc2[q] + 2;
+          if (need <= 0) continue; // an in-flight wave already has it handled
+          if (half < need * 1.05) continue;
+          const w = planets[q].owner === 1 ? aggro : 1;
+          const score = (planets[q].prod * w) / ((need + 4) * (0.35 + d));
+          if (!best || score > best.score) best = { s, q, score };
+        }
+      }
+      if (best) return send([best.s], best.q);
+
+      // 3. Nothing affordable: funnel the richest rear garrison to the front line.
+      if (mine.length < 2) return;
+      const rich = mine.reduce((a, b) => (planets[a].troops >= planets[b].troops ? a : b));
+      if (planets[rich].troops < 40) return;
+      const enemies = planets.filter((p) => p.owner === 1);
+      if (!enemies.length) return;
+      const toFront = (i: number) => Math.min(...enemies.map((e) => dist(planets[i], e)));
+      const front = mine.reduce((a, b) => (toFront(a) <= toFront(b) ? a : b));
+      if (front !== rich) send([rich], front);
+    }
+
+    // ---------- rendering ----------
+    function setSize() {
+      const cssW = canvas.parentElement!.clientWidth;
+      if (cssW < 10) return;
+      W = cssW;
+      const cssH = Math.round(cssW * ASPECT);
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(cssW * dpr);
+      canvas.height = Math.round(cssH * dpr);
+      canvas.style.height = `${cssH}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, W * ASPECT);
+      const now = performance.now();
+
+      for (let i = 0; i < planets.length; i++) {
+        const p = planets[i];
+        const x = p.x * W;
+        const y = p.y * W;
+        const r = p.r * W;
+
+        ctx.save();
+        if (p.owner === 0) {
+          ctx.fillStyle = '#e2e8f0';
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          ctx.shadowColor = GLOW[p.owner];
+          ctx.shadowBlur = 14;
+          ctx.fillStyle = COLOR[p.owner];
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+
+        if (selection.has(i) || (hoverPlanet === i && p.owner === 1 && state === 'running')) {
+          ctx.save();
+          ctx.strokeStyle = COLOR[1];
+          ctx.lineWidth = selection.has(i) ? 2 : 1;
+          ctx.setLineDash([4, 4]);
+          ctx.lineDashOffset = -(now / 60) % 8;
+          ctx.beginPath();
+          ctx.arc(x, y, r + 5, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        ctx.fillStyle = p.owner === 0 ? '#64748b' : '#fff';
+        ctx.font = `700 ${Math.max(10, r * 0.62)}px Atkinson, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(Math.floor(p.troops)), x, y + 1);
+      }
+
+      // Drag preview: dashed lines from every sender to the pointer.
+      if (dragging && pointerIn && downPlanet >= 0) {
+        const senders = new Set(selection);
+        senders.add(downPlanet);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(99,102,241,0.45)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        for (const s of senders) {
+          ctx.beginPath();
+          ctx.moveTo(planets[s].x * W, planets[s].y * W);
+          ctx.lineTo(pointerX, pointerY);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        if (hoverPlanet >= 0 && hoverPlanet !== downPlanet) {
+          const t = planets[hoverPlanet];
+          ctx.beginPath();
+          ctx.arc(t.x * W, t.y * W, t.r * W + 5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      for (const f of fleets) {
+        const a = planets[f.from];
+        const b = planets[f.to];
+        // Ease departure/arrival so fleets visually clear the planet rims.
+        const x = (a.x + (b.x - a.x) * f.t) * W;
+        const y = (a.y + (b.y - a.y) * f.t) * W;
+        const r = Math.min(11, 3.5 + Math.sqrt(f.count) * 0.8);
+        ctx.save();
+        ctx.shadowColor = GLOW[f.owner];
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = COLOR[f.owner];
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ctx.font = '700 10px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(248,250,252,0.9)';
+        ctx.strokeText(String(f.count), x, y - r - 2);
+        ctx.fillStyle = COLOR[f.owner];
+        ctx.fillText(String(f.count), x, y - r - 2);
+      }
+    }
+
+    function updateHud() {
+      const total = { 1: 0, 2: 0, 0: 0 } as Record<number, number>;
+      for (const p of planets) total[p.owner] += p.troops;
+      for (const f of fleets) total[f.owner] += f.count;
+      const sum = Math.max(1, total[0] + total[1] + total[2]);
+      $('pcount').textContent = String(Math.floor(total[1]));
+      $('ecount').textContent = String(Math.floor(total[2]));
+      $('pbar').style.width = `${(total[1] / sum) * 100}%`;
+      $('ebar').style.width = `${(total[2] / sum) * 100}%`;
+    }
+
+    // ---------- input ----------
+    function planetAt(x: number, y: number) {
+      for (let i = 0; i < planets.length; i++) {
+        const p = planets[i];
+        const hit = Math.max(p.r * W, 14) + 4; // fat-finger friendly
+        if (Math.hypot(p.x * W - x, p.y * W - y) <= hit) return i;
+      }
+      return -1;
+    }
+
+    function localXY(e: PointerEvent) {
+      const rect = canvas.getBoundingClientRect();
+      return [e.clientX - rect.left, e.clientY - rect.top];
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (state !== 'running') return;
+      e.preventDefault();
+      canvas.setPointerCapture(e.pointerId);
+      [downX, downY] = localXY(e);
+      pointerX = downX;
+      pointerY = downY;
+      pointerIn = true;
+      downPlanet = planetAt(downX, downY);
+      dragging = false;
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      [pointerX, pointerY] = localXY(e);
+      pointerIn = true;
+      hoverPlanet = planetAt(pointerX, pointerY);
+      if (downPlanet >= 0 && planets[downPlanet].owner === 1 && Math.hypot(pointerX - downX, pointerY - downY) > 10) {
+        dragging = true;
+      }
+      canvas.style.cursor =
+        hoverPlanet >= 0 && (planets[hoverPlanet].owner === 1 || selection.size || dragging) ? 'pointer' : 'default';
+    });
+
+    canvas.addEventListener('pointerleave', () => {
+      pointerIn = false;
+      hoverPlanet = -1;
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+      if (state !== 'running') return;
+      const [x, y] = localXY(e);
+      const up = planetAt(x, y);
+
+      if (downPlanet >= 0 && planets[downPlanet].owner === 1) {
+        if (dragging) {
+          if (up >= 0 && up !== downPlanet) {
+            send([...selection, downPlanet], up);
+            selection.clear();
+          }
+        } else {
+          const now = performance.now();
+          if (lastTap.i === downPlanet && now - lastTap.t < 320) {
+            planets.forEach((p, i) => p.owner === 1 && selection.add(i));
+          } else if (selection.has(downPlanet)) {
+            selection.delete(downPlanet);
+          } else {
+            selection.add(downPlanet);
+          }
+          lastTap = { i: downPlanet, t: now };
+        }
+      } else if (up >= 0 && planets[up].owner !== 1 && selection.size) {
+        send([...selection], up);
+        selection.clear();
+      } else if (up < 0) {
+        selection.clear();
+      }
+
+      downPlanet = -1;
+      dragging = false;
+    });
+
+    canvas.addEventListener('pointercancel', () => {
+      downPlanet = -1;
+      dragging = false;
+    });
+
+    $('play').addEventListener('click', () => {
+      if (state === 'over') reset(true);
+      else {
+        state = 'running';
+        overlay.style.display = 'none';
+      }
+    });
+    $('reset').addEventListener('click', () => reset(true));
+
+    // ---------- main loop ----------
+    function frame(now: number) {
+      const dt = Math.min(0.05, (now - last) / 1000) || 0;
+      last = now;
+      if (state === 'running') {
+        update(dt);
+        updateHud();
+      }
+      draw();
+      raf = requestAnimationFrame(frame);
+    }
+
+    new ResizeObserver(setSize).observe(canvas.parentElement!);
+    setSize();
+    reset(false);
+    raf = requestAnimationFrame(frame);
+  }
+</script>

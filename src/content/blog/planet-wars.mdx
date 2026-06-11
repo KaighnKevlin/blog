@@ -1,0 +1,25 @@
+---
+title: "Planet Wars"
+description: "The Flash game genre that secretly taught a generation real-time strategy — and the AIs I built to play it. (DRAFT)"
+pubDate: "Jun 10 2026"
+---
+
+import PlanetWars from '../../components/PlanetWars.astro';
+
+*(DRAFT — widget demo. Copy to come.)*
+
+You remember this game even if you don't remember its name. Circles on a screen. Yours are one color. You click a circle, click another circle, and half your little army flies across the void. Galcon, Phage Wars, Tentacle Wars, Auralux — the whole Flash-era genre.
+
+Here's the thing nobody tells you: in 2010, Google ran an entire AI programming competition on exactly this game. It's a *genuinely hard* AI problem — no turns, simultaneous moves, troops in flight. Minimax, the engine behind every chess and Connect 4 bot, is useless here.
+
+But first, play it. You're indigo, starting on the left. Bigger planets produce troops faster. Neutral gray planets don't produce anything until somebody pays the entry fee.
+
+<PlanetWars ai="random" title="Rung 1 — Random" subtitle="it sends fleets at random. you'll be fine." />
+
+That was the control group. Now the real thing:
+
+<PlanetWars ai="greedy" title="Rung 2 — Greedy" subtitle="expands to the cheapest neutral first" />
+
+<PlanetWars ai="smart" title="Rung 3 — Smart" subtitle="counts in-flight fleets. good luck." />
+
+*(More copy and rungs to come: why minimax fails without turns, the Google AI Challenge winning strategies, and the tempo bot.)*
