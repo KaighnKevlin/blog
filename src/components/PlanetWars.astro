@@ -22,9 +22,15 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
 ---
 
 <div class="pw-widget rounded-xl border border-gray-200 p-5 sm:p-6 my-8 bg-white select-none" data-ai={ai}>
-  <div class="flex items-baseline justify-between mb-3">
+  <div class="flex items-center justify-between mb-3 gap-3">
     <h3 class="text-lg font-semibold">{title}</h3>
-    <span class="text-[10px] text-gray-400 uppercase tracking-wider font-mono">{subtitle}</span>
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="text-[10px] text-gray-400 uppercase tracking-wider font-mono truncate">{subtitle}</span>
+      <button data-pw="fs" class="shrink-0 text-gray-400 transition-colors hover:text-gray-700" title="Fullscreen" aria-label="Toggle fullscreen">
+        <svg data-pw="fs-expand" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>
+        <svg data-pw="fs-compress" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="hidden"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"></path></svg>
+      </button>
+    </div>
   </div>
 
   <div class="flex items-center gap-3 mb-3 font-mono text-xs">
@@ -37,7 +43,7 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
     <span data-pw="ecount" class="w-12 font-bold text-rose-500">—</span>
   </div>
 
-  <div class="relative">
+  <div class="relative pw-stage">
     <canvas data-pw="canvas" class="block w-full rounded-lg" style="touch-action: none; background: #f8fafc"></canvas>
     <div data-pw="overlay" class="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-lg bg-white/60 backdrop-blur-[2px]">
       <div data-pw="msg" class="text-base font-semibold text-gray-800"></div>
@@ -58,6 +64,30 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
     </button>
   </div>
 </div>
+
+<style is:global>
+  /* Cinematic mode: the card fills the screen, the stage flexes to the
+     remaining height, and the canvas letterboxes inside it. */
+  .pw-widget:fullscreen {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    padding: 1.25rem 2rem 1rem;
+    background: #fff;
+  }
+  .pw-widget:fullscreen .pw-stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pw-widget:fullscreen::backdrop {
+    background: #fff;
+  }
+</style>
 
 <script>
   type Owner = 0 | 1 | 2; // neutral | you | enemy
@@ -753,13 +783,19 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
 
     // ---------- rendering ----------
     function setSize() {
-      const cssW = canvas.parentElement!.clientWidth;
+      const stage = canvas.parentElement!;
+      let cssW = stage.clientWidth;
+      // Fullscreen: fit the fixed-aspect map inside the stage (letterbox).
+      if (document.fullscreenElement === root) {
+        cssW = Math.min(cssW, Math.floor(stage.clientHeight / ASPECT));
+      }
       if (cssW < 10) return;
       W = cssW;
       const cssH = Math.round(cssW * ASPECT);
       const dpr = window.devicePixelRatio || 1;
       canvas.width = Math.round(cssW * dpr);
       canvas.height = Math.round(cssH * dpr);
+      canvas.style.width = `${cssW}px`;
       canvas.style.height = `${cssH}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       draw();
@@ -963,6 +999,24 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
       }
     });
     $('reset').addEventListener('click', () => reset(true));
+
+    // ---------- fullscreen ----------
+    const fsBtn = $('fs');
+    if (!document.fullscreenEnabled) {
+      fsBtn.style.display = 'none'; // e.g. iPhone Safari
+    } else {
+      fsBtn.addEventListener('click', () => {
+        if (document.fullscreenElement === root) document.exitFullscreen();
+        else root.requestFullscreen();
+      });
+      document.addEventListener('fullscreenchange', () => {
+        const fs = document.fullscreenElement === root;
+        $('fs-expand').classList.toggle('hidden', fs);
+        $('fs-compress').classList.toggle('hidden', !fs);
+        fsBtn.title = fs ? 'Exit fullscreen' : 'Fullscreen';
+        setSize();
+      });
+    }
 
     // ---------- main loop ----------
     function frame(now: number) {
