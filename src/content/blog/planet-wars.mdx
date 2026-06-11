@@ -22,4 +22,10 @@ That was the control group. Now the real thing:
 
 <PlanetWars ai="smart" title="Rung 3 — Smart" subtitle="counts in-flight fleets. good luck." />
 
-*(More copy and rungs to come: why minimax fails without turns, the Google AI Challenge winning strategies, and the tempo bot.)*
+And finally: in 2010, a Hungarian Lisp hacker named Gábor Melis won Google's AI Challenge — 4,600 entrants, exactly this game — with a bot called *bocsimacko*. The twist? It searched **one move deep**. No game tree. All of its strength lived in the evaluation function: for every planet, it simulated the *full-attack future* — what happens if everyone hurls everything at this planet right now — and it refused to count any plan that needed its own ships to react instantly. It also knew the genre's dirtiest trick: let *you* pay a neutral's entry fee, then arrive one tick later and take it off you.
+
+This is that bot, [ported from his Common Lisp](https://github.com/melisgl/planet-wars) to your browser:
+
+<PlanetWars ai="bocsimacko" title="Rung 4 — Bocsimacko" subtitle="the 2010 world champion. it is reading your fleets." />
+
+*(More copy to come: why minimax fails without turns, futures & surpluses, the snipe, and the one-character parameter change that won the whole thing.)*

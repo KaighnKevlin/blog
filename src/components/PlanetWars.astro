@@ -4,13 +4,17 @@
 // then a target, to send half its garrison. Capture everything to win.
 // The opponent's strategy is chosen per-instance via the `ai` prop so the
 // post can ladder up difficulty, Connect-4-style:
-//   "random" — fires half-stacks at random planets (comically bad baseline)
-//   "greedy" — expands to the cheapest affordable neutral, then attacks
-//   "smart"  — counts in-flight fleets, rescues threatened planets, weighs
-//              production/cost/distance, consolidates rear garrisons forward
+//   "random"     — fires half-stacks at random planets (comically bad baseline)
+//   "greedy"     — expands to the cheapest affordable neutral, then attacks
+//   "smart"      — counts in-flight fleets, rescues threatened planets, weighs
+//                  production/cost/distance, consolidates rear garrisons forward
+//   "bocsimacko" — a JS port of Gábor Melis's bot that won the Google AI
+//                  Challenge 2010 (github.com/melisgl/planet-wars): futures,
+//                  cumulative surpluses, full-attack evaluation, take-over-and-
+//                  defend step targets with snipe timings, 1-ply move scoring
 // The script initialises every .pw-widget on the page independently.
 interface Props {
-  ai?: 'random' | 'greedy' | 'smart';
+  ai?: 'random' | 'greedy' | 'smart' | 'bocsimacko';
   title?: string;
   subtitle?: string;
 }
@@ -80,7 +84,8 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
   const PROD_K = 46; // prod = radius * PROD_K
   const COLOR: Record<number, string> = { 1: '#6366f1', 2: '#f43f5e' };
   const GLOW: Record<number, string> = { 1: 'rgba(99,102,241,0.45)', 2: 'rgba(244,63,94,0.45)' };
-  const AI_INTERVAL: Record<string, number> = { random: 1.6, greedy: 1.25, smart: 0.85 };
+  const AI_INTERVAL: Record<string, number> = { random: 1.6, greedy: 1.25, smart: 0.85, bocsimacko: 0.5 };
+  const INF = 1e9;
 
   document.querySelectorAll<HTMLElement>('.pw-widget').forEach(initWidget);
 
@@ -177,6 +182,16 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
       }
     }
 
+    // Exact-count send — the champion's orders specify ship counts, not halves.
+    function sendExact(s: number, d: number, count: number) {
+      if (s === d) return;
+      const p = planets[s];
+      const n = Math.min(Math.floor(p.troops), Math.round(count));
+      if (n < 1) return;
+      p.troops -= n;
+      fleets.push({ from: s, to: d, owner: p.owner, count: n, t: 0, dur: dist(p, planets[d]) / SPEED });
+    }
+
     function update(dt: number) {
       elapsed += dt;
       for (const p of planets) if (p.owner !== 0) p.troops = Math.min(CAP, p.troops + p.prod * dt);
@@ -230,6 +245,7 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
       if (!mine.length) return;
       if (aiKind === 'random') return aiRandom(mine);
       if (aiKind === 'greedy') return aiGreedy(mine);
+      if (aiKind === 'bocsimacko') return aiBocsimacko();
       aiSmart(mine);
     }
 
@@ -301,6 +317,438 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
       const toFront = (i: number) => Math.min(...enemies.map((e) => dist(planets[i], e)));
       const front = mine.reduce((a, b) => (toFront(a) <= toFront(b) ? a : b));
       if (front !== rich) send([rich], front);
+    }
+
+    // ==================================================================
+    // "bocsimacko" — port of Gábor Melis's Google AI Challenge 2010
+    // winner (Common Lisp → TS). The original is turn-based; we
+    // discretize continuous time into TICKs. Internally the AI is
+    // relabeled "player 1" so the original's player-1-centric logic
+    // ports sign-for-sign. Faithful: compute-future, cumulative-surplus,
+    // full-attack futures (with the famous MIN-TURN-TO-DEPART=2 trick),
+    // take-over-and-defend step targets incl. neutral-snipe timings,
+    // find-step (farthest sources first, synchronized arrivals), 1-ply
+    // move scoring, surplus redistribution. Omitted: the 4-ply
+    // alpha-beta opening, result caching, dynamic horizon.
+    // ==================================================================
+    const TICK = 0.5; // seconds per simulated "turn"
+    const HZ = 28; // horizon in ticks (~14s lookahead)
+
+    interface BSim {
+      P: number;
+      owner: number[]; // 0 neutral, 1 = AI ("us"), 2 = human ("them")
+      ships: number[];
+      growth: number[]; // per tick
+      arr1: number[][]; // arrivals per tick, [planet][tick]
+      arr2: number[][];
+      dep1: number[][]; // planned departures per tick
+      dep2: number[][];
+      dt: number[][]; // travel time in ticks
+    }
+    interface BFut {
+      own: number[];
+      shp: number[];
+      bal: number; // ships them-lost-to-neutrals minus us-lost (us-positive)
+    }
+    interface BOrder {
+      src: number;
+      dst: number;
+      n: number;
+      t: number; // departure tick (0 = now)
+    }
+
+    const zrow = () => new Array(HZ).fill(0);
+
+    function bsimFromGame(): BSim {
+      const P = planets.length;
+      const sim: BSim = {
+        P,
+        owner: planets.map((p) => (p.owner === 2 ? 1 : p.owner === 1 ? 2 : 0)),
+        ships: planets.map((p) => p.troops),
+        growth: planets.map((p) => p.prod * TICK),
+        arr1: planets.map(zrow),
+        arr2: planets.map(zrow),
+        dep1: planets.map(zrow),
+        dep2: planets.map(zrow),
+        dt: planets.map((a) => planets.map((b) => Math.max(1, Math.ceil(dist(a, b) / SPEED / TICK)))),
+      };
+      for (const f of fleets) {
+        const tk = Math.min(HZ - 1, Math.max(1, Math.ceil(((1 - f.t) * f.dur) / TICK)));
+        (f.owner === 2 ? sim.arr1 : sim.arr2)[f.to][tk] += f.count;
+      }
+      return sim;
+    }
+
+    // resolve-battle: among (neutral c0, us c1, them c2) the largest force
+    // wins with (largest - second) ships; on a tie the incumbent keeps 0.
+    function resolveB(owner: number, c0: number, c1: number, c2: number): [number, number] {
+      let i0 = 0, i1 = 1, i2 = 2;
+      if (c0 < c1) { [c0, c1] = [c1, c0]; [i0, i1] = [i1, i0]; }
+      if (c1 < c2) {
+        [c1, c2] = [c2, c1]; [i1, i2] = [i2, i1];
+        if (c0 < c1) { [c0, c1] = [c1, c0]; [i0, i1] = [i1, i0]; }
+      }
+      return c0 > c1 ? [i0, c0 - c1] : [owner, 0];
+    }
+
+    type ResolveFn = (owner: number, c0: number, c1: number, c2: number, t: number) => [number, number];
+
+    // compute-future*: simulate one planet's timeline. Returns null in
+    // strict mode if a planned departure is impossible.
+    function computeFutureB(
+      sim: BSim, p: number,
+      arr1 = sim.arr1[p], arr2 = sim.arr2[p],
+      opts: { strict?: boolean; resolve?: ResolveFn } = {},
+    ): BFut | null {
+      const resolve = opts.resolve || ((o, c0, c1, c2) => resolveB(o, c0, c1, c2));
+      const own: number[] = new Array(HZ);
+      const shp: number[] = new Array(HZ);
+      let owner = sim.owner[p];
+      let ships = sim.ships[p];
+      let bal = 0;
+      for (let t = 0; t < HZ; t++) {
+        const a1 = arr1[t], a2 = arr2[t];
+        if (owner === 0) {
+          if (a1 || a2) {
+            bal -= Math.min(ships, a1);
+            bal += Math.min(ships, a2);
+            [owner, ships] = resolve(owner, ships, a1, a2, t);
+          }
+        } else if (owner === 1) {
+          ships += a1;
+          if (a2) [owner, ships] = resolve(1, 0, ships, a2, t);
+        } else {
+          ships += a2;
+          if (a1) [owner, ships] = resolve(2, 0, a1, ships, t);
+        }
+        own[t] = owner;
+        shp[t] = ships;
+        const d = owner === 1 ? sim.dep1[p][t] : owner === 2 ? sim.dep2[p][t] : 0;
+        if (owner !== 0) {
+          if (opts.strict && (ships - d < -1e-6 || (owner === 1 ? sim.dep2[p][t] : sim.dep1[p][t]) > 1e-6)) return null;
+          ships = Math.max(0, ships - d) + sim.growth[p];
+        } else if (opts.strict && (sim.dep1[p][t] > 1e-6 || sim.dep2[p][t] > 1e-6)) {
+          return null;
+        }
+      }
+      return { own, shp, bal };
+    }
+
+    // cumulative-surplus: backward scan — ships that may leave at tick t
+    // without the planet ever falling afterwards. Us-positive, them-negative.
+    function cumSurplusB(
+      sim: BSim, p: number, fut: BFut,
+      includeAttacked: boolean, minT1 = 0, minT2 = 0,
+    ): number[] {
+      const sur = zrow();
+      const lastOwner = fut.own[HZ - 1];
+      let cur1 = INF, cur2 = INF, curOwner = -1;
+      for (let i = HZ - 1; i >= 0; i--) {
+        const owner = fut.own[i];
+        if (owner === 0 || (!includeAttacked && owner !== lastOwner)) break;
+        let eff = fut.shp[i] - (owner === 1 ? sim.dep1[p][i] : sim.dep2[p][i]);
+        if (eff < 0) eff = 0;
+        if (owner === 1) cur1 = Math.min(curOwner === 2 ? Math.max(0, cur1 - 1) : cur1, eff);
+        else cur2 = Math.min(curOwner === 1 ? Math.max(0, cur2 - 1) : cur2, eff);
+        curOwner = owner;
+        if (owner === 1 && i >= minT1) sur[i] = cur1;
+        if (owner === 2 && i >= minT2) sur[i] = -cur2;
+      }
+      return sur;
+    }
+
+    // uncumulate-surplus: per-tick increments assuming earlier surpluses left.
+    function uncumB(cum: number[]): number[] {
+      const s = cum.slice();
+      let sum = 0;
+      for (let j = 0; j < HZ; j++) {
+        if ((sum < 0 && s[j] > 0) || (sum > 0 && s[j] < 0)) sum = 0;
+        s[j] -= sum;
+        sum += s[j];
+      }
+      return s;
+    }
+
+    // add-surplus-into-arrivals: a neighbour T ticks away streams its
+    // surplus at the target, subject to earliest-departure/arrival limits.
+    function addSurplus(
+      sur: number[], a1: number[], a2: number[], T: number,
+      o: { cum?: boolean; minA1?: number; minA2?: number; minD1?: number; minD2?: number },
+    ) {
+      const mta1 = Math.max(T, o.minA1 || 0, (o.minD1 || 0) + T);
+      const mta2 = Math.max(T, o.minA2 || 0, (o.minD2 || 0) + T);
+      let sum1 = 0, sum2 = 0;
+      for (let i = T; i < HZ; i++) {
+        let s = sur[i - T];
+        if (i === mta1 && !o.cum) s += sum1;
+        if (i === mta2 && !o.cum) s += sum2;
+        if (s > 0) {
+          if (i < mta1) sum1 += s;
+          else a1[i] += s;
+        } else if (s < 0) {
+          if (i < mta2) sum2 += s;
+          else a2[i] -= s;
+        }
+      }
+    }
+
+    // compute-full-attack-arrivals: everyone streams surplus at planet p.
+    function fafArrivals(
+      sim: BSim, p: number, surs: (number[] | null)[],
+      o: { addNormal?: boolean; cum?: boolean; minA1?: number; minA2?: number; minD1?: number; minD2?: number } = {},
+    ): [number[], number[]] {
+      const a1 = o.addNormal ? sim.arr1[p].slice() : zrow();
+      const a2 = o.addNormal ? sim.arr2[p].slice() : zrow();
+      for (let q = 0; q < sim.P; q++) {
+        if (q === p || !surs[q]) continue;
+        addSurplus(surs[q]!, a1, a2, sim.dt[q][p], o);
+      }
+      return [a1, a2];
+    }
+
+    function fafFuture(
+      sim: BSim, p: number, surs: (number[] | null)[],
+      o: { minA1?: number; minA2?: number; minD1?: number; minD2?: number } = {},
+    ): BFut {
+      const [a1, a2] = fafArrivals(sim, p, surs, { ...o, addNormal: true });
+      return computeFutureB(sim, p, a1, a2)!;
+    }
+
+    // score: growth-ticks captured by us minus theirs, plus the balance of
+    // ships burned on neutrals.
+    function scoreB(sim: BSim, p: number, fut: BFut): number {
+      let s = fut.bal;
+      for (let t = 0; t < HZ; t++) {
+        if (fut.own[t] === 1) s += sim.growth[p];
+        else if (fut.own[t] === 2) s -= sim.growth[p];
+      }
+      return s;
+    }
+
+    function firstNonNeutralTurn(fut: BFut): number {
+      for (let t = 0; t < HZ; t++) if (fut.own[t] !== 0) return t;
+      return -1;
+    }
+
+    // evaluate/full-attack with eval*'s asymmetric departure delays: our
+    // ships can't leave for 2 ticks (no reliance on instant reactions);
+    // theirs can leave immediately. The one-character championship trick.
+    function evalB(sim: BSim): number {
+      const futs = planets.map((_, p) => computeFutureB(sim, p)!);
+      const surs = futs.map((f, p) => (f.own[HZ - 1] === 0 ? null : uncumB(cumSurplusB(sim, p, f, false))));
+      let total = 0;
+      for (let p = 0; p < sim.P; p++) {
+        const fut = futs[p];
+        if (fut.own[HZ - 1] === 0) {
+          // Still neutral at the horizon: tiny tie-break only ("who would
+          // win the race"), real value appears when a move captures it.
+          total += fut.bal + 1e-3 * scoreB(sim, p, fafFuture(sim, p, surs, { minD1: 2 }));
+        } else {
+          // Snipe-aware candidate arrival timings; score pessimistically.
+          const cands = [0];
+          if (sim.owner[p] === 0 && sim.ships[p] > sim.growth[p]) {
+            const fnn = firstNonNeutralTurn(fut);
+            if (fnn > 0) {
+              if (!cands.includes(fnn)) cands.push(fnn);
+              if (!cands.includes(fnn + 1)) cands.push(fnn + 1);
+            }
+          }
+          let worst = Infinity;
+          for (const mta of cands) {
+            const f = fafFuture(sim, p, surs, { minA1: mta, minA2: mta, minD1: 2 });
+            worst = Math.min(worst, scoreB(sim, p, { own: f.own, shp: f.shp, bal: fut.bal }));
+          }
+          total += worst;
+        }
+      }
+      return total;
+    }
+
+    // find-first-possible-takeover-opportunity
+    function findTakeover(
+      fut: BFut, cpaMine: number[], cpaTheirs: number[], minArrive: number, sure: boolean,
+    ): { n: number; turn: number } | null {
+      for (let turn = Math.max(1, minArrive); turn < HZ; turn++) {
+        const own = fut.own[turn];
+        const ns = fut.shp[turn];
+        if (own === 1) continue;
+        if (!sure) {
+          if (ns < cpaMine[turn]) return { n: ns + 1, turn };
+        } else {
+          if (own === 0 && turn + 1 < HZ && ns < cpaMine[turn] && cpaTheirs[turn + 1] < cpaMine[turn]) {
+            return { n: 1 + Math.max(cpaTheirs[turn + 1], ns), turn };
+          }
+          if (own === 2 && ns + cpaTheirs[turn] < cpaMine[turn]) {
+            return { n: 1 + ns + cpaTheirs[turn], turn };
+          }
+        }
+      }
+      return null;
+    }
+
+    // maybe-take-over-and-defend: replay the future with a cheating battle
+    // resolver that records exactly the arrivals needed to win every fight
+    // at/after minArrive, bounded by what our planets could deliver (cpa).
+    function takeOverAndDefend(
+      sim: BSim, p: number, fut: BFut,
+      cpaMine: number[], cpaTheirs: number[],
+      minArrive: number, sure: boolean,
+    ): number[] | null {
+      const cheat = zrow();
+      const arrStar = sim.arr1[p].slice();
+      let used = 0;
+      let minA = minArrive;
+      if (fut.own[minArrive] !== 1) {
+        const opp = findTakeover(fut, cpaMine, cpaTheirs, minArrive, sure);
+        if (sure) {
+          const plain = findTakeover(fut, cpaMine, cpaTheirs, minArrive, false);
+          if (opp && plain && opp.n === plain.n && opp.turn === plain.turn) return null; // adds nothing over the non-sure step
+        }
+        if (opp) {
+          minA = opp.turn + 1;
+          cheat[opp.turn] += opp.n;
+          arrStar[opp.turn] += opp.n;
+          used += opp.n;
+        }
+      }
+      computeFutureB(sim, p, arrStar, sim.arr2[p], {
+        resolve: (owner, c0, c1, c2, t) => {
+          const [no, ns] = resolveB(owner, c0, c1, c2);
+          if (t >= minA && no !== 1 && ns <= cpaMine[t] - used) {
+            cheat[t] += ns;
+            used += ns;
+            return [1, 0];
+          }
+          return [no, ns];
+        },
+      });
+      return used > 0 ? cheat : null;
+    }
+
+    // find-neutral-steal: first tick the enemy would own a currently
+    // neutral planet — arriving one tick later snipes their investment.
+    function findNeutralSteal(sim: BSim, p: number, fut: BFut): number | null {
+      if (sim.owner[p] !== 0) return null;
+      for (let t = 0; t < HZ; t++) if (fut.own[t] === 2) return t;
+      return null;
+    }
+
+    // find-step: source the needed arrivals from cumulative surpluses,
+    // farthest planets first (cheap reinforcements stay flexible).
+    function findStep(sim: BSim, cumSurs: number[][], dst: number, target: number[]): BOrder[] {
+      const used = new Array(sim.P).fill(0);
+      const step: BOrder[] = [];
+      for (let t = 0; t < HZ; t++) {
+        let need = target[t];
+        if (need <= 0) continue;
+        const orders: BOrder[] = [];
+        const srcs = [];
+        for (let q = 0; q < sim.P; q++) if (q !== dst && sim.dt[q][dst] <= t) srcs.push(q);
+        srcs.sort((a, b) => sim.dt[b][dst] - sim.dt[a][dst]);
+        for (const q of srcs) {
+          const t0 = t - sim.dt[q][dst];
+          const avail = cumSurs[q][t0] - used[q]; // us-positive by convention
+          const n = Math.min(avail, need);
+          if (n > 0.5) {
+            orders.push({ src: q, dst, n, t: t0 });
+            need -= n;
+            used[q] += n;
+          }
+        }
+        if (need <= 0.5) step.push(...orders);
+        else return step; // can't satisfy this tick: keep what's complete
+      }
+      return step;
+    }
+
+    function applyOrders(sim: BSim, orders: BOrder[]): BSim {
+      const out: BSim = {
+        ...sim,
+        arr1: sim.arr1.map((r) => r.slice()),
+        dep1: sim.dep1.map((r) => r.slice()),
+      };
+      for (const o of orders) {
+        out.dep1[o.src][o.t] += o.n;
+        out.arr1[o.dst][Math.min(HZ - 1, o.t + sim.dt[o.src][o.dst])] += o.n;
+      }
+      return out;
+    }
+
+    function validMove(sim: BSim, orders: BOrder[]): boolean {
+      const s = applyOrders(sim, orders);
+      const involved = new Set<number>();
+      for (const o of orders) { involved.add(o.src); involved.add(o.dst); }
+      for (const p of involved) if (!computeFutureB(s, p, undefined, undefined, { strict: true })) return false;
+      return true;
+    }
+
+    // generate-candidate-steps + score + combine (1-ply, like the original
+    // after its opening phase).
+    function aiBocsimacko() {
+      const sim = bsimFromGame();
+      const futs = planets.map((_, p) => computeFutureB(sim, p)!);
+      // Optimistic surpluses for sourcing: theirs only counts from tick 1.
+      const cumSurs = planets.map((_, p) => cumSurplusB(sim, p, futs[p], true, 0, 1));
+      const surs = cumSurs.map(uncumB);
+      const steps: BOrder[][] = [];
+
+      for (let p = 0; p < sim.P; p++) {
+        const faf = fafFuture(sim, p, surs);
+        if (!faf.own.includes(1)) continue; // not takeable even in a full attack
+        const [cpaMine, cpaTheirs] = fafArrivals(sim, p, cumSurs, { addNormal: false, cum: true });
+        const targets: (number[] | null)[] = [
+          takeOverAndDefend(sim, p, futs[p], cpaMine, cpaTheirs, 0, false),
+          takeOverAndDefend(sim, p, futs[p], cpaMine, cpaTheirs, 0, true),
+        ];
+        const stealTurn = findNeutralSteal(sim, p, futs[p]);
+        if (stealTurn !== null && sim.ships[p] > sim.growth[p]) {
+          targets.push(takeOverAndDefend(sim, p, futs[p], cpaMine, cpaTheirs, stealTurn + 1, false));
+        }
+        for (const target of targets) {
+          if (!target) continue;
+          const step = findStep(sim, cumSurs, p, target);
+          if (step.length) steps.push(step);
+        }
+        // Redistribute: stream today's surplus from rear planets here.
+        if (futs[p].own[HZ - 1] === 1) {
+          for (let q = 0; q < sim.P; q++) {
+            const sur = surs[q][0];
+            if (q !== p && sim.owner[q] === 1 && sur > 0.5 && sim.dt[q][p] < HZ) {
+              steps.push([{ src: q, dst: p, n: sur, t: 0 }]);
+            }
+          }
+        }
+      }
+      if (!steps.length) return;
+
+      const scored = steps
+        .map((step) => ({ step, score: validMove(sim, step) ? evalB(applyOrders(sim, step)) : -Infinity }))
+        .filter((s) => s.score > -Infinity)
+        .sort((a, b) => b.score - a.score);
+      if (!scored.length) return;
+
+      // Greedily merge compatible steps into composite moves, best-first.
+      const moves: { step: BOrder[]; score: number }[] = [...scored];
+      for (let i = 0; i < Math.min(5, scored.length); i++) {
+        let move = scored[i].step;
+        for (let j = i + 1; j < scored.length; j++) {
+          const combo = [...move, ...scored[j].step];
+          if (validMove(sim, combo)) {
+            move = combo;
+            moves.push({ step: move, score: evalB(applyOrders(sim, move)) });
+          }
+        }
+      }
+      moves.sort((a, b) => b.score - a.score);
+
+      // Only this tick's orders are real; the rest is replanned next tick,
+      // exactly like the original resubmitting each turn.
+      const baseline = evalB(sim);
+      const best = moves[0];
+      if (best.score <= baseline + 1e-9) return; // doing nothing is a move too
+      for (const o of best.step) {
+        if (o.t === 0 && planets[o.src].owner === 2) sendExact(o.src, o.dst, o.n);
+      }
     }
 
     // ---------- rendering ----------
