@@ -28,4 +28,14 @@ This is that bot, [ported from his Common Lisp](https://github.com/melisgl/plane
 
 <PlanetWars ai="bocsimacko" title="Rung 4 — Bocsimacko" subtitle="the 2010 world champion. it is reading your fleets." />
 
-*(More copy to come: why minimax fails without turns, futures & surpluses, the snipe, and the one-character parameter change that won the whole thing.)*
+## Rung 5: a different game
+
+The classic genre has one old flaw: the best move is often *no move*. Sit, stack, wait for your opponent to commit first. So for the last rung I changed the economics.
+
+Every planet now has a **carrying capacity**. Growth is logistic: an empty planet grows at full speed, a full planet grows at *zero*, and an overstacked one decays back down. Hoarding is now idle capital — the only way to keep your production curve up is to keep troops **moving** into fresh capacity. While we're rewriting physics: big fleets fly slower than snipes (your death-stack is visible *and* late), you choose how much each send commits (25/50/100%), and you can drag between your own planets to build **supply routes** that forward the excess automatically.
+
+The ring around each planet shows how close it is to idling. Full ring = wasted production.
+
+<PlanetWars mode="house" title="Rung 5 — New Rules" subtitle="full planets stop growing. keep moving." />
+
+*(More copy to come: why minimax fails without turns, futures & surpluses, the snipe, the one-character parameter change that won the whole thing, and why rung 5's economics are just diminishing marginal returns.)*

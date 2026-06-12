@@ -12,16 +12,27 @@
 //                  Challenge 2010 (github.com/melisgl/planet-wars): futures,
 //                  cumulative surpluses, full-attack evaluation, take-over-and-
 //                  defend step targets with snipe timings, 1-ply move scoring
+// mode="house" is a different game on the same engine (rung 5): planets
+// have capacity caps with logistic growth (full planets stop producing,
+// overstacked ones decay), big fleets fly slower than snipes, players can
+// set persistent supply routes (drag own planet → own planet), and the
+// send fraction is selectable. The AI for house mode is saturation-aware.
 // The script initialises every .pw-widget on the page independently.
 interface Props {
   ai?: 'random' | 'greedy' | 'smart' | 'bocsimacko';
+  mode?: 'classic' | 'house';
   title?: string;
   subtitle?: string;
 }
-const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = Astro.props;
+const {
+  ai = 'smart',
+  mode = 'classic',
+  title = 'Planet Wars',
+  subtitle = mode === 'house' ? 'new rules — keep moving' : `you vs. ${ai} AI`,
+} = Astro.props;
 ---
 
-<div class="pw-widget rounded-xl border border-gray-200 p-5 sm:p-6 my-8 bg-white select-none" data-ai={ai}>
+<div class="pw-widget rounded-xl border border-gray-200 p-5 sm:p-6 my-8 bg-white select-none" data-ai={ai} data-mode={mode}>
   <div class="flex items-center justify-between mb-3 gap-3">
     <h3 class="text-lg font-semibold">{title}</h3>
     <div class="flex items-center gap-3 min-w-0">
@@ -47,6 +58,7 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
     <canvas data-pw="canvas" class="block w-full rounded-lg" style="touch-action: none; background: #f8fafc"></canvas>
     <div data-pw="overlay" class="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-lg bg-white/60 backdrop-blur-[2px]">
       <div data-pw="msg" class="text-base font-semibold text-gray-800"></div>
+      <div data-pw="stats" class="font-mono text-[11px] text-gray-500"></div>
       <button data-pw="play" class="rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700">
         Play
       </button>
@@ -57,11 +69,22 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
     <span>
       <span class="mr-2 inline-flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-indigo-500"></span>you</span>
       <span class="mr-2 inline-flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-rose-500"></span>them</span>
-      tap a planet, then a target — sends half · double-tap selects all · drag works too
+      {mode === 'house'
+        ? 'full planets stop producing — keep moving · drag your planet → your planet for a supply route (again to remove)'
+        : 'tap a planet, then a target — sends half · double-tap selects all · drag works too'}
     </span>
-    <button data-pw="reset" class="shrink-0 rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50">
-      New game
-    </button>
+    <span class="flex shrink-0 items-center gap-2">
+      {mode === 'house' && (
+        <span data-pw="rates" class="flex overflow-hidden rounded-full border border-gray-200" title="Fraction of garrison each send commits">
+          <button data-rate="25" class="px-2 py-1 text-[11px] font-semibold text-gray-500 transition-colors">25%</button>
+          <button data-rate="50" class="px-2 py-1 text-[11px] font-semibold text-gray-500 transition-colors">50%</button>
+          <button data-rate="100" class="px-2 py-1 text-[11px] font-semibold text-gray-500 transition-colors">100%</button>
+        </span>
+      )}
+      <button data-pw="reset" class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50">
+        New game
+      </button>
+    </span>
   </div>
 </div>
 
@@ -97,7 +120,8 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
     r: number;
     owner: Owner;
     troops: number;
-    prod: number; // troops per second while owned
+    prod: number; // troops per second while owned (at zero saturation in house mode)
+    cap: number; // garrison capacity (house mode: logistic carrying capacity)
   }
   interface Fleet {
     from: number;
@@ -114,7 +138,7 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
   const PROD_K = 46; // prod = radius * PROD_K
   const COLOR: Record<number, string> = { 1: '#6366f1', 2: '#f43f5e' };
   const GLOW: Record<number, string> = { 1: 'rgba(99,102,241,0.45)', 2: 'rgba(244,63,94,0.45)' };
-  const AI_INTERVAL: Record<string, number> = { random: 1.6, greedy: 1.25, smart: 0.85, bocsimacko: 0.5 };
+  const AI_INTERVAL: Record<string, number> = { random: 1.6, greedy: 1.25, smart: 0.85, bocsimacko: 0.5, house: 0.9 };
   const INF = 1e9;
 
   document.querySelectorAll<HTMLElement>('.pw-widget').forEach(initWidget);
@@ -126,6 +150,7 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
     const overlay = $('overlay');
     const msgEl = $('msg');
     const aiKind = root.dataset.ai || 'smart';
+    const house = root.dataset.mode === 'house';
 
     let planets: Planet[] = [];
     let fleets: Fleet[] = [];
@@ -135,6 +160,12 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
     let aiTimer = 0;
     let last = 0;
     let raf = 0;
+    // House mode extras (inert in classic).
+    let sendRate = 0.5;
+    let timeScale = 1; // killing-blow slow-mo
+    let routeTimer = 0;
+    const routes = new Map<number, number>(); // supply lines: src -> dst
+    const stats = { waves: 0, biggest: 0, captures: 0 };
 
     // --- input state ---
     const selection = new Set<number>();
@@ -155,27 +186,35 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
         x > r + 0.02 && x < 1 - r - 0.02 && y > r + 0.02 && y < ASPECT - r - 0.02 &&
         ps.every((q) => Math.hypot(q.x - x, q.y - y) > q.r + r + 0.035);
 
-      ps.push({ x: 0.1, y: ASPECT / 2, r: 0.042, owner: 1, troops: 25, prod: 0 });
-      ps.push({ x: 0.9, y: ASPECT / 2, r: 0.042, owner: 2, troops: 25, prod: 0 });
-      // Sometimes a fat contested planet in the dead center.
-      if (Math.random() < 0.5) ps.push({ x: 0.5, y: ASPECT / 2, r: 0.052, owner: 0, troops: 45, prod: 0 });
+      const homeR = house ? 0.04 : 0.042;
+      ps.push({ x: 0.1, y: ASPECT / 2, r: homeR, owner: 1, troops: 25, prod: 0, cap: 0 });
+      ps.push({ x: 0.9, y: ASPECT / 2, r: homeR, owner: 2, troops: 25, prod: 0, cap: 0 });
+      // A fat contested planet in the dead center (always, in house mode).
+      if (house || Math.random() < 0.5) {
+        ps.push({ x: 0.5, y: ASPECT / 2, r: 0.052, owner: 0, troops: 45, prod: 0, cap: 0 });
+      }
 
+      // House mode: a denser map — circulation needs places to circulate to.
+      const wantPairs = house ? 6 : 4;
       let pairs = 0;
-      for (let tries = 0; pairs < 4 && tries < 500; tries++) {
-        const r = 0.022 + Math.random() * 0.024;
+      for (let tries = 0; pairs < wantPairs && tries < 700; tries++) {
+        const r = house ? 0.019 + Math.random() * 0.021 : 0.022 + Math.random() * 0.024;
         const x = 0.07 + Math.random() * 0.41;
         const y = 0.06 + Math.random() * (ASPECT - 0.12);
         const mx = 1 - x;
         const my = ASPECT - y;
         if (!fits(x, y, r)) continue;
         if (Math.hypot(mx - x, my - y) <= 2 * r + 0.035) continue; // mirror twin too close
-        const troops = Math.round(r * 520 * (0.7 + Math.random() * 0.8));
-        ps.push({ x, y, r, owner: 0, troops, prod: 0 });
+        const troops = Math.round(r * (house ? 470 : 520) * (0.7 + Math.random() * 0.8));
+        ps.push({ x, y, r, owner: 0, troops, prod: 0, cap: 0 });
         if (!fits(mx, my, r)) { ps.pop(); continue; }
-        ps.push({ x: mx, y: my, r, owner: 0, troops, prod: 0 });
+        ps.push({ x: mx, y: my, r, owner: 0, troops, prod: 0, cap: 0 });
         pairs++;
       }
-      for (const p of ps) p.prod = p.r * PROD_K;
+      for (const p of ps) {
+        p.prod = p.r * PROD_K;
+        p.cap = house ? Math.round(p.r * 2400) : CAP;
+      }
       return ps;
     }
 
@@ -183,6 +222,12 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
       planets = genMap();
       fleets = [];
       selection.clear();
+      routes.clear();
+      stats.waves = 0;
+      stats.biggest = 0;
+      stats.captures = 0;
+      timeScale = 1;
+      routeTimer = 0;
       elapsed = 0;
       aiTimer = 0;
       if (autostart) {
@@ -191,6 +236,7 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
       } else {
         state = 'idle';
         msgEl.textContent = '';
+        $('stats').textContent = '';
         ($('play') as HTMLElement).textContent = 'Play';
         overlay.style.display = 'flex';
       }
@@ -201,30 +247,49 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
     // ---------- core mechanics ----------
     const dist = (a: Planet, b: Planet) => Math.hypot(a.x - b.x, a.y - b.y);
 
+    // House mode: heavy fleets are slow, snipes are quick. ~1.2x for a
+    // scout, 1.0x around 25 ships, 0.8x for a 100-ship death-stack.
+    function fleetSpeed(n: number) {
+      return house ? SPEED * (1.25 - 0.45 * Math.min(1, Math.sqrt(n) / 10)) : SPEED;
+    }
+
+    function launch(s: number, d: number, n: number) {
+      const p = planets[s];
+      p.troops -= n;
+      fleets.push({ from: s, to: d, owner: p.owner, count: n, t: 0, dur: dist(p, planets[d]) / fleetSpeed(n) });
+      if (p.owner === 1) {
+        stats.waves++;
+        stats.biggest = Math.max(stats.biggest, n);
+      }
+    }
+
     function send(sources: number[], dst: number) {
       for (const s of new Set(sources)) {
         if (s === dst) continue;
         const p = planets[s];
-        const n = Math.floor(p.troops / 2);
+        const n = Math.floor(p.troops * (p.owner === 1 ? sendRate : 0.5));
         if (n < 1) continue;
-        p.troops -= n;
-        fleets.push({ from: s, to: dst, owner: p.owner, count: n, t: 0, dur: dist(p, planets[dst]) / SPEED });
+        launch(s, dst, n);
       }
     }
 
     // Exact-count send — the champion's orders specify ship counts, not halves.
     function sendExact(s: number, d: number, count: number) {
       if (s === d) return;
-      const p = planets[s];
-      const n = Math.min(Math.floor(p.troops), Math.round(count));
+      const n = Math.min(Math.floor(planets[s].troops), Math.round(count));
       if (n < 1) return;
-      p.troops -= n;
-      fleets.push({ from: s, to: d, owner: p.owner, count: n, t: 0, dur: dist(p, planets[d]) / SPEED });
+      launch(s, d, n);
     }
 
     function update(dt: number) {
       elapsed += dt;
-      for (const p of planets) if (p.owner !== 0) p.troops = Math.min(CAP, p.troops + p.prod * dt);
+      for (const p of planets) {
+        if (p.owner === 0) continue;
+        // House: logistic growth — full planets idle, overstacked ones decay
+        // back toward capacity. Classic: linear growth to the hard cap.
+        if (house) p.troops += p.prod * dt * (1 - p.troops / p.cap);
+        else p.troops = Math.min(CAP, p.troops + p.prod * dt);
+      }
 
       for (let i = fleets.length - 1; i >= 0; i--) {
         const f = fleets[i];
@@ -232,20 +297,39 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
         if (f.t < 1) continue;
         const q = planets[f.to];
         if (q.owner === f.owner) {
-          q.troops = Math.min(CAP, q.troops + f.count);
+          // House: reinforcing past capacity is allowed — it just decays.
+          q.troops = house ? q.troops + f.count : Math.min(CAP, q.troops + f.count);
         } else {
           q.troops -= f.count;
           if (q.troops < 0) {
+            if (f.owner === 1) stats.captures++;
             q.owner = f.owner;
             q.troops = -q.troops;
             selection.delete(f.to);
+            routes.delete(f.to);
           }
         }
         fleets.splice(i, 1);
       }
 
+      // Supply routes: periodically forward the excess above ~45% capacity.
+      if (house) {
+        routeTimer += dt;
+        if (routeTimer >= 0.7) {
+          routeTimer = 0;
+          for (const [s, d] of routes) {
+            if (planets[s].owner !== 1 || planets[d].owner !== 1) {
+              routes.delete(s);
+              continue;
+            }
+            const excess = Math.floor(planets[s].troops - 0.35 * planets[s].cap);
+            if (excess >= 3) sendExact(s, d, excess);
+          }
+        }
+      }
+
       aiTimer += dt;
-      if (aiTimer >= AI_INTERVAL[aiKind]) {
+      if (aiTimer >= AI_INTERVAL[house ? 'house' : aiKind]) {
         aiTimer = 0;
         aiTick();
       }
@@ -254,9 +338,31 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
       if (!alive(1) || !alive(2)) endGame(alive(1));
     }
 
+    // Killing-blow slow-mo: when either side's last planet has a lethal
+    // fleet inbound, drop into bullet time for the finish.
+    function updateTimeScale() {
+      timeScale = 1;
+      if (!house) return;
+      for (const side of [1, 2] as Owner[]) {
+        const owned = planets.map((p, i) => [p, i] as const).filter(([p]) => p.owner === side);
+        if (owned.length !== 1) continue;
+        const [p, idx] = owned[0];
+        for (const f of fleets) {
+          if (f.to === idx && f.owner !== side && f.count > p.troops) {
+            timeScale = 0.35;
+            return;
+          }
+        }
+      }
+    }
+
     function endGame(won: boolean) {
       state = 'over';
       msgEl.textContent = won ? 'You conquered the system 🪐' : 'Your empire fell 💀';
+      const m = Math.floor(elapsed / 60);
+      const s = String(Math.floor(elapsed % 60)).padStart(2, '0');
+      $('stats').textContent =
+        `${m}:${s} · ${stats.waves} wave${stats.waves === 1 ? '' : 's'} · biggest ${stats.biggest} · ${stats.captures} capture${stats.captures === 1 ? '' : 's'}`;
       ($('play') as HTMLElement).textContent = 'Play again';
       overlay.style.display = 'flex';
     }
@@ -273,6 +379,7 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
     function aiTick() {
       const mine = planets.map((_, i) => i).filter((i) => planets[i].owner === 2);
       if (!mine.length) return;
+      if (house) return aiHouse(mine);
       if (aiKind === 'random') return aiRandom(mine);
       if (aiKind === 'greedy') return aiGreedy(mine);
       if (aiKind === 'bocsimacko') return aiBocsimacko();
@@ -347,6 +454,113 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
       const toFront = (i: number) => Math.min(...enemies.map((e) => dist(planets[i], e)));
       const front = mine.reduce((a, b) => (toFront(a) <= toFront(b) ? a : b));
       if (front !== rich) send([rich], front);
+    }
+
+    // House-rules AI: aiSmart's bones, but saturation-aware. Production
+    // is wasted at full planets, so it sources attacks from its most
+    // saturated worlds, values targets it can grow into, and circulates
+    // idle garrisons toward the front instead of stockpiling.
+    function aiHouse(mine: number[]) {
+      const { inc1, inc2 } = incoming();
+      const sat = (i: number) => planets[i].troops / planets[i].cap;
+
+      // 1. Rescue, same as smart.
+      for (const m of mine) {
+        if (planets[m].troops + inc2[m] - inc1[m] >= -1) continue;
+        const helpers = mine
+          .filter((o) => o !== m && planets[o].troops > 10)
+          .sort((a, b) => dist(planets[a], planets[m]) - dist(planets[b], planets[m]));
+        if (helpers.length) return send([helpers[0]], m);
+      }
+
+      // 2. Closing phase: once clearly ahead, stop farming neutrals.
+      // Funnel halves into a staging planet near the weakest player world,
+      // then deliver one exact-count kill blow. Without this, the capped
+      // economy spreads thin and never finishes.
+      const playerIdx = planets.map((_, i) => i).filter((i) => planets[i].owner === 1);
+      if (mine.length >= 4 && mine.length >= 2 * playerIdx.length && playerIdx.length) {
+        const q = playerIdx.reduce((a, b) => (planets[a].troops <= planets[b].troops ? a : b));
+        const stage = mine.reduce((a, b) =>
+          dist(planets[a], planets[q]) <= dist(planets[b], planets[q]) ? a : b);
+        const tt = dist(planets[stage], planets[q]) / fleetSpeed(planets[q].troops);
+        const defGrowth = planets[q].prod * tt * Math.max(0, 1 - sat(q));
+        const need = planets[q].troops + defGrowth + inc1[q] - inc2[q] + 2;
+        if (need > 0) {
+          if (planets[stage].troops > need * 1.15) return sendExact(stage, q, Math.ceil(need * 1.1));
+          const feeders = mine
+            .filter((i) => i !== stage && planets[i].troops >= 10)
+            .sort((a, b) => sat(b) - sat(a))
+            .slice(0, 2);
+          if (feeders.length) return send(feeders, stage);
+        }
+      }
+
+      // 3. Attack: production-per-cost, weighted by source saturation
+      // (full planets push hardest — their growth is idling).
+      const aggro = elapsed > 40 ? 1.35 : 0.9;
+      let best: { s: number; q: number; score: number } | null = null;
+      for (const s of mine) {
+        const half = Math.floor(planets[s].troops / 2);
+        if (half < 4) continue;
+        for (let q = 0; q < planets.length; q++) {
+          if (planets[q].owner === 2) continue;
+          const d = dist(planets[s], planets[q]);
+          const tt = d / fleetSpeed(half);
+          const defGrowth = planets[q].owner === 1
+            ? planets[q].prod * tt * Math.max(0, 1 - sat(q)) // defenders near cap barely reinforce
+            : 0;
+          const need =
+            planets[q].owner === 0
+              ? planets[q].troops - inc2[q] + inc1[q] + 1
+              : planets[q].troops + defGrowth + inc1[q] - inc2[q] + 2;
+          if (need <= 0) continue;
+          if (half < need * 1.05) continue;
+          const w = (planets[q].owner === 1 ? aggro : 1) * (0.55 + sat(s));
+          const score = (planets[q].prod * w) / ((need + 4) * (0.35 + d));
+          if (!best || score > best.score) best = { s, q, score };
+        }
+      }
+      if (best) return send([best.s], best.q);
+
+      // 2b. Coordinated strike: caps mean no single planet can fund an
+      // attack, so combine the most saturated half-stacks. Without this
+      // the capped economy stalemates forever.
+      const srcs = mine
+        .filter((i) => Math.floor(planets[i].troops / 2) >= 3)
+        .sort((a, b) => sat(b) - sat(a))
+        .slice(0, 3);
+      if (srcs.length >= 2 && srcs.reduce((n, i) => n + sat(i), 0) / srcs.length > 0.4) {
+        const pool = srcs.reduce((n, i) => n + Math.floor(planets[i].troops / 2), 0);
+        let strike: { q: number; score: number } | null = null;
+        for (let q = 0; q < planets.length; q++) {
+          if (planets[q].owner === 2) continue;
+          const dAvg = srcs.reduce((n, i) => n + dist(planets[i], planets[q]), 0) / srcs.length;
+          const tt = dAvg / fleetSpeed(pool / srcs.length);
+          const defGrowth = planets[q].owner === 1 ? planets[q].prod * tt * Math.max(0, 1 - sat(q)) : 0;
+          const need =
+            planets[q].owner === 0
+              ? planets[q].troops - inc2[q] + inc1[q] + 1
+              : planets[q].troops + defGrowth + inc1[q] - inc2[q] + 2;
+          if (need <= 0 || pool < need * 1.15) continue;
+          const w = planets[q].owner === 1 ? aggro : 1;
+          const score = (planets[q].prod * w) / ((need + 4) * (0.35 + dAvg));
+          if (!strike || score > strike.score) strike = { q, score };
+        }
+        if (strike) return send(srcs, strike.q);
+      }
+
+      // 3. Circulate: dump the most saturated planet's excess into the
+      // emptiest own planet nearest the front. Never sit at cap.
+      if (mine.length < 2) return;
+      const richest = mine.reduce((a, b) => (sat(a) >= sat(b) ? a : b));
+      if (sat(richest) < 0.5) return;
+      const enemies = planets.filter((p) => p.owner === 1);
+      const toFront = (i: number) =>
+        enemies.length ? Math.min(...enemies.map((e) => dist(planets[i], e))) : 0;
+      const target = mine
+        .filter((i) => i !== richest)
+        .reduce((a, b) => (toFront(a) + 0.25 * sat(a) <= toFront(b) + 0.25 * sat(b) ? a : b));
+      send([richest], target);
     }
 
     // ==================================================================
@@ -830,6 +1044,23 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
         }
         ctx.restore();
 
+        // House mode: capacity ring — how close this planet is to idle.
+        if (house && p.owner !== 0) {
+          const fill = Math.min(1, p.troops / p.cap);
+          ctx.save();
+          ctx.strokeStyle = COLOR[p.owner];
+          ctx.globalAlpha = 0.18;
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(x, y, r + 3.5, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = fill >= 1 ? 0.9 : 0.55;
+          ctx.beginPath();
+          ctx.arc(x, y, r + 3.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fill);
+          ctx.stroke();
+          ctx.restore();
+        }
+
         if (selection.has(i) || (hoverPlanet === i && p.owner === 1 && state === 'running')) {
           ctx.save();
           ctx.strokeStyle = COLOR[1];
@@ -837,7 +1068,7 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
           ctx.setLineDash([4, 4]);
           ctx.lineDashOffset = -(now / 60) % 8;
           ctx.beginPath();
-          ctx.arc(x, y, r + 5, 0, Math.PI * 2);
+          ctx.arc(x, y, r + (house ? 8 : 5), 0, Math.PI * 2);
           ctx.stroke();
           ctx.restore();
         }
@@ -847,6 +1078,41 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(String(Math.floor(p.troops)), x, y + 1);
+      }
+
+      // Supply routes: marching-ants arrows between linked planets.
+      if (house) {
+        for (const [s, d] of routes) {
+          const a = planets[s];
+          const b = planets[d];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const len = Math.hypot(dx, dy) || 1;
+          const ux = dx / len;
+          const uy = dy / len;
+          const x1 = (a.x + ux * (a.r + 0.012)) * W;
+          const y1 = (a.y + uy * (a.r + 0.012)) * W;
+          const x2 = (b.x - ux * (b.r + 0.014)) * W;
+          const y2 = (b.y - uy * (b.r + 0.014)) * W;
+          ctx.save();
+          ctx.strokeStyle = 'rgba(99,102,241,0.35)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([3, 5]);
+          ctx.lineDashOffset = -(now / 40) % 8; // ants march toward the destination
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = 'rgba(99,102,241,0.5)';
+          ctx.beginPath();
+          ctx.moveTo(x2, y2);
+          ctx.lineTo(x2 - (ux * 7 - uy * 4), y2 - (uy * 7 + ux * 4));
+          ctx.lineTo(x2 - (ux * 7 + uy * 4), y2 - (uy * 7 - ux * 4));
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
       }
 
       // Drag preview: dashed lines from every sender to the pointer.
@@ -961,7 +1227,13 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
       if (downPlanet >= 0 && planets[downPlanet].owner === 1) {
         if (dragging) {
           if (up >= 0 && up !== downPlanet) {
-            send([...selection, downPlanet], up);
+            if (house && planets[up].owner === 1) {
+              // Drag between your own planets: toggle a supply route.
+              if (routes.get(downPlanet) === up) routes.delete(downPlanet);
+              else routes.set(downPlanet, up);
+            } else {
+              send([...selection, downPlanet], up);
+            }
             selection.clear();
           }
         } else {
@@ -1018,17 +1290,45 @@ const { ai = 'smart', title = 'Planet Wars', subtitle = `you vs. ${ai} AI` } = A
       });
     }
 
+    // ---------- send-rate picker (house mode) ----------
+    const ratesEl = root.querySelector<HTMLElement>('[data-pw="rates"]');
+    function paintRates() {
+      ratesEl?.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
+        const active = Number(b.dataset.rate) / 100 === sendRate;
+        b.classList.toggle('bg-indigo-600', active);
+        b.classList.toggle('text-white', active);
+        b.classList.toggle('text-gray-500', !active);
+      });
+    }
+    ratesEl?.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
+      b.addEventListener('click', () => {
+        sendRate = Number(b.dataset.rate) / 100;
+        paintRates();
+      });
+    });
+    paintRates();
+
     // ---------- main loop ----------
     function frame(now: number) {
       const dt = Math.min(0.05, (now - last) / 1000) || 0;
       last = now;
       if (state === 'running') {
-        update(dt);
+        updateTimeScale();
+        update(dt * timeScale);
         updateHud();
       }
       draw();
       raf = requestAnimationFrame(frame);
     }
+
+    // Debug/test handle (used by headless playtests and the future arena).
+    (root as any).__pw = {
+      get planets() { return planets; },
+      get fleets() { return fleets; },
+      get routes() { return routes; },
+      get state() { return state; },
+      get stats() { return { ...stats, elapsed }; },
+    };
 
     new ResizeObserver(setSize).observe(canvas.parentElement!);
     setSize();
