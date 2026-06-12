@@ -1,0 +1,1405 @@
+---
+// Playable Galcon-like ("Planet Wars"). Circles are planets; owned planets
+// produce troops over time (bigger = faster). Click/tap one of your planets,
+// then a target, to send half its garrison. Capture everything to win.
+// The opponent's strategy is chosen per-instance via the `ai` prop so the
+// post can ladder up difficulty, Connect-4-style:
+//   "random"     — fires half-stacks at random planets (comically bad baseline)
+//   "greedy"     — expands to the cheapest affordable neutral, then attacks
+//   "smart"      — counts in-flight fleets, rescues threatened planets, weighs
+//                  production/cost/distance, consolidates rear garrisons forward
+//   "bocsimacko" — a JS port of Gábor Melis's bot that won the Google AI
+//                  Challenge 2010 (github.com/melisgl/planet-wars): futures,
+//                  cumulative surpluses, full-attack evaluation, take-over-and-
+//                  defend step targets with snipe timings, 1-ply move scoring
+// mode="house" is a different game on the same engine (rung 5): planets
+// have capacity caps with logistic growth (full planets stop producing,
+// overstacked ones decay), big fleets fly slower than snipes, players can
+// set persistent supply routes (drag own planet → own planet), and the
+// send fraction is selectable. The AI for house mode is saturation-aware.
+// The script initialises every .pw-widget on the page independently.
+interface Props {
+  ai?: 'random' | 'greedy' | 'smart' | 'bocsimacko';
+  mode?: 'classic' | 'house';
+  title?: string;
+  subtitle?: string;
+}
+const {
+  ai = 'smart',
+  mode = 'classic',
+  title = 'Planet Wars',
+  subtitle = mode === 'house' ? 'new rules — keep moving' : `you vs. ${ai} AI`,
+} = Astro.props;
+---
+
+<div class="pw-widget rounded-xl border border-gray-200 p-5 sm:p-6 my-8 bg-white select-none" data-ai={ai} data-mode={mode}>
+  <div class="flex items-center justify-between mb-3 gap-3">
+    <h3 class="text-lg font-semibold">{title}</h3>
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="text-[10px] text-gray-400 uppercase tracking-wider font-mono truncate">{subtitle}</span>
+      <button data-pw="fs" class="shrink-0 text-gray-400 transition-colors hover:text-gray-700" title="Fullscreen" aria-label="Toggle fullscreen">
+        <svg data-pw="fs-expand" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>
+        <svg data-pw="fs-compress" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="hidden"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"></path></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-3 mb-3 font-mono text-xs">
+    <span data-pw="pcount" class="w-12 text-right font-bold text-indigo-600">—</span>
+    <div class="flex h-1.5 flex-1 overflow-hidden rounded-full bg-gray-200">
+      <div data-pw="pbar" class="h-full rounded-r-full bg-indigo-500" style="width: 8%; transition: width 0.5s ease"></div>
+      <div class="h-full flex-1"></div>
+      <div data-pw="ebar" class="h-full rounded-l-full bg-rose-500" style="width: 8%; transition: width 0.5s ease"></div>
+    </div>
+    <span data-pw="ecount" class="w-12 font-bold text-rose-500">—</span>
+  </div>
+
+  <div class="relative pw-stage">
+    <canvas data-pw="canvas" class="block w-full rounded-lg" style="touch-action: none; background: #f8fafc"></canvas>
+    <div data-pw="overlay" class="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-lg bg-white/60 backdrop-blur-[2px]">
+      <div data-pw="msg" class="text-base font-semibold text-gray-800"></div>
+      <div data-pw="stats" class="font-mono text-[11px] text-gray-500"></div>
+      <button data-pw="play" class="rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700">
+        Play
+      </button>
+    </div>
+  </div>
+
+  <div class="mt-3 flex items-center justify-between gap-3 text-[11px] text-gray-400">
+    <span>
+      <span class="mr-2 inline-flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-indigo-500"></span>you</span>
+      <span class="mr-2 inline-flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-rose-500"></span>them</span>
+      {mode === 'house'
+        ? 'full planets stop producing — keep moving · drag your planet → your planet for a supply route (again to remove)'
+        : 'tap a planet, then a target — sends half · double-tap selects all · drag works too'}
+    </span>
+    <span class="flex shrink-0 items-center gap-2">
+      {mode === 'house' && (
+        <span data-pw="rates" class="flex overflow-hidden rounded-full border border-gray-200" title="Fraction of garrison each send commits">
+          <button data-rate="25" class="px-2 py-1 text-[11px] font-semibold text-gray-500 transition-colors">25%</button>
+          <button data-rate="50" class="px-2 py-1 text-[11px] font-semibold text-gray-500 transition-colors">50%</button>
+          <button data-rate="100" class="px-2 py-1 text-[11px] font-semibold text-gray-500 transition-colors">100%</button>
+        </span>
+      )}
+      <button data-pw="reset" class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50">
+        New game
+      </button>
+    </span>
+  </div>
+</div>
+
+<style is:global>
+  /* Cinematic mode: the card fills the screen, the stage flexes to the
+     remaining height, and the canvas letterboxes inside it. */
+  .pw-widget:fullscreen {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    padding: 1.25rem 2rem 1rem;
+    background: #fff;
+  }
+  .pw-widget:fullscreen .pw-stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pw-widget:fullscreen::backdrop {
+    background: #fff;
+  }
+</style>
+
+<script>
+  type Owner = 0 | 1 | 2; // neutral | you | enemy
+  interface Planet {
+    x: number; // normalized: x in [0,1], y in [0,ASPECT], r in width units
+    y: number;
+    r: number;
+    owner: Owner;
+    troops: number;
+    prod: number; // troops per second while owned (at zero saturation in house mode)
+    cap: number; // garrison capacity (house mode: logistic carrying capacity)
+  }
+  interface Fleet {
+    from: number;
+    to: number;
+    owner: Owner;
+    count: number;
+    t: number; // progress 0..1
+    dur: number; // seconds for the full trip
+  }
+
+  const ASPECT = 0.62; // canvas height / width; all map coords live in this box
+  const SPEED = 0.17; // fleet speed in width-units per second
+  const CAP = 500; // garrison cap, keeps labels sane
+  const PROD_K = 46; // prod = radius * PROD_K
+  const COLOR: Record<number, string> = { 1: '#6366f1', 2: '#f43f5e' };
+  const GLOW: Record<number, string> = { 1: 'rgba(99,102,241,0.45)', 2: 'rgba(244,63,94,0.45)' };
+  const AI_INTERVAL: Record<string, number> = { random: 1.6, greedy: 1.25, smart: 0.85, bocsimacko: 0.5, house: 0.9 };
+  const INF = 1e9;
+
+  document.querySelectorAll<HTMLElement>('.pw-widget').forEach(initWidget);
+
+  function initWidget(root: HTMLElement) {
+    const $ = (k: string) => root.querySelector(`[data-pw="${k}"]`) as HTMLElement;
+    const canvas = $('canvas') as unknown as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d')!;
+    const overlay = $('overlay');
+    const msgEl = $('msg');
+    const aiKind = root.dataset.ai || 'smart';
+    const house = root.dataset.mode === 'house';
+
+    let planets: Planet[] = [];
+    let fleets: Fleet[] = [];
+    let state: 'idle' | 'running' | 'over' = 'idle';
+    let W = 300; // CSS pixel width of the canvas
+    let elapsed = 0;
+    let aiTimer = 0;
+    let last = 0;
+    let raf = 0;
+    // House mode extras (inert in classic).
+    let sendRate = 0.5;
+    let timeScale = 1; // killing-blow slow-mo
+    let routeTimer = 0;
+    const routes = new Map<number, number>(); // supply lines: src -> dst
+    const stats = { waves: 0, biggest: 0, captures: 0 };
+
+    // --- input state ---
+    const selection = new Set<number>();
+    let downPlanet = -1;
+    let downX = 0;
+    let downY = 0;
+    let dragging = false;
+    let hoverPlanet = -1;
+    let pointerX = 0;
+    let pointerY = 0;
+    let pointerIn = false;
+    let lastTap = { i: -1, t: 0 };
+
+    // ---------- map generation (point-symmetric so neither side is favored) ----------
+    function genMap() {
+      const ps: Planet[] = [];
+      const fits = (x: number, y: number, r: number) =>
+        x > r + 0.02 && x < 1 - r - 0.02 && y > r + 0.02 && y < ASPECT - r - 0.02 &&
+        ps.every((q) => Math.hypot(q.x - x, q.y - y) > q.r + r + 0.035);
+
+      const homeR = house ? 0.04 : 0.042;
+      ps.push({ x: 0.1, y: ASPECT / 2, r: homeR, owner: 1, troops: 25, prod: 0, cap: 0 });
+      ps.push({ x: 0.9, y: ASPECT / 2, r: homeR, owner: 2, troops: 25, prod: 0, cap: 0 });
+      // A fat contested planet in the dead center (always, in house mode).
+      if (house || Math.random() < 0.5) {
+        ps.push({ x: 0.5, y: ASPECT / 2, r: 0.052, owner: 0, troops: 45, prod: 0, cap: 0 });
+      }
+
+      // House mode: a denser map — circulation needs places to circulate to.
+      const wantPairs = house ? 6 : 4;
+      let pairs = 0;
+      for (let tries = 0; pairs < wantPairs && tries < 700; tries++) {
+        const r = house ? 0.019 + Math.random() * 0.021 : 0.022 + Math.random() * 0.024;
+        const x = 0.07 + Math.random() * 0.41;
+        const y = 0.06 + Math.random() * (ASPECT - 0.12);
+        const mx = 1 - x;
+        const my = ASPECT - y;
+        if (!fits(x, y, r)) continue;
+        if (Math.hypot(mx - x, my - y) <= 2 * r + 0.035) continue; // mirror twin too close
+        const troops = Math.round(r * (house ? 470 : 520) * (0.7 + Math.random() * 0.8));
+        ps.push({ x, y, r, owner: 0, troops, prod: 0, cap: 0 });
+        if (!fits(mx, my, r)) { ps.pop(); continue; }
+        ps.push({ x: mx, y: my, r, owner: 0, troops, prod: 0, cap: 0 });
+        pairs++;
+      }
+      for (const p of ps) {
+        p.prod = p.r * PROD_K;
+        p.cap = house ? Math.round(p.r * 2400) : CAP;
+      }
+      return ps;
+    }
+
+    function reset(autostart: boolean) {
+      planets = genMap();
+      fleets = [];
+      selection.clear();
+      routes.clear();
+      stats.waves = 0;
+      stats.biggest = 0;
+      stats.captures = 0;
+      timeScale = 1;
+      routeTimer = 0;
+      elapsed = 0;
+      aiTimer = 0;
+      if (autostart) {
+        state = 'running';
+        overlay.style.display = 'none';
+      } else {
+        state = 'idle';
+        msgEl.textContent = '';
+        $('stats').textContent = '';
+        ($('play') as HTMLElement).textContent = 'Play';
+        overlay.style.display = 'flex';
+      }
+      updateHud();
+      draw();
+    }
+
+    // ---------- core mechanics ----------
+    const dist = (a: Planet, b: Planet) => Math.hypot(a.x - b.x, a.y - b.y);
+
+    // House mode: heavy fleets are slow, snipes are quick. ~1.2x for a
+    // scout, 1.0x around 25 ships, 0.8x for a 100-ship death-stack.
+    function fleetSpeed(n: number) {
+      return house ? SPEED * (1.25 - 0.45 * Math.min(1, Math.sqrt(n) / 10)) : SPEED;
+    }
+
+    function launch(s: number, d: number, n: number) {
+      const p = planets[s];
+      p.troops -= n;
+      fleets.push({ from: s, to: d, owner: p.owner, count: n, t: 0, dur: dist(p, planets[d]) / fleetSpeed(n) });
+      if (p.owner === 1) {
+        stats.waves++;
+        stats.biggest = Math.max(stats.biggest, n);
+      }
+    }
+
+    function send(sources: number[], dst: number) {
+      for (const s of new Set(sources)) {
+        if (s === dst) continue;
+        const p = planets[s];
+        const n = Math.floor(p.troops * (p.owner === 1 ? sendRate : 0.5));
+        if (n < 1) continue;
+        launch(s, dst, n);
+      }
+    }
+
+    // Exact-count send — the champion's orders specify ship counts, not halves.
+    function sendExact(s: number, d: number, count: number) {
+      if (s === d) return;
+      const n = Math.min(Math.floor(planets[s].troops), Math.round(count));
+      if (n < 1) return;
+      launch(s, d, n);
+    }
+
+    function update(dt: number) {
+      elapsed += dt;
+      for (const p of planets) {
+        if (p.owner === 0) continue;
+        // House: logistic growth — full planets idle, overstacked ones decay
+        // back toward capacity. Classic: linear growth to the hard cap.
+        if (house) p.troops += p.prod * dt * (1 - p.troops / p.cap);
+        else p.troops = Math.min(CAP, p.troops + p.prod * dt);
+      }
+
+      for (let i = fleets.length - 1; i >= 0; i--) {
+        const f = fleets[i];
+        f.t += dt / f.dur;
+        if (f.t < 1) continue;
+        const q = planets[f.to];
+        if (q.owner === f.owner) {
+          // House: reinforcing past capacity is allowed — it just decays.
+          q.troops = house ? q.troops + f.count : Math.min(CAP, q.troops + f.count);
+        } else {
+          q.troops -= f.count;
+          if (q.troops < 0) {
+            if (f.owner === 1) stats.captures++;
+            q.owner = f.owner;
+            q.troops = -q.troops;
+            selection.delete(f.to);
+            routes.delete(f.to);
+          }
+        }
+        fleets.splice(i, 1);
+      }
+
+      // Supply routes: periodically forward the excess above ~45% capacity.
+      if (house) {
+        routeTimer += dt;
+        if (routeTimer >= 0.7) {
+          routeTimer = 0;
+          for (const [s, d] of routes) {
+            if (planets[s].owner !== 1 || planets[d].owner !== 1) {
+              routes.delete(s);
+              continue;
+            }
+            const excess = Math.floor(planets[s].troops - 0.35 * planets[s].cap);
+            if (excess >= 3) sendExact(s, d, excess);
+          }
+        }
+      }
+
+      aiTimer += dt;
+      if (aiTimer >= AI_INTERVAL[house && aiKind !== 'bocsimacko' ? 'house' : aiKind]) {
+        aiTimer = 0;
+        aiTick();
+      }
+
+      const alive = (o: Owner) => planets.some((p) => p.owner === o) || fleets.some((f) => f.owner === o);
+      if (!alive(1) || !alive(2)) endGame(alive(1));
+    }
+
+    // Killing-blow slow-mo: when either side's last planet has a lethal
+    // fleet inbound, drop into bullet time for the finish.
+    function updateTimeScale() {
+      timeScale = 1;
+      if (!house) return;
+      for (const side of [1, 2] as Owner[]) {
+        const owned = planets.map((p, i) => [p, i] as const).filter(([p]) => p.owner === side);
+        if (owned.length !== 1) continue;
+        const [p, idx] = owned[0];
+        for (const f of fleets) {
+          if (f.to === idx && f.owner !== side && f.count > p.troops) {
+            timeScale = 0.35;
+            return;
+          }
+        }
+      }
+    }
+
+    function endGame(won: boolean) {
+      state = 'over';
+      msgEl.textContent = won ? 'You conquered the system 🪐' : 'Your empire fell 💀';
+      const m = Math.floor(elapsed / 60);
+      const s = String(Math.floor(elapsed % 60)).padStart(2, '0');
+      $('stats').textContent =
+        `${m}:${s} · ${stats.waves} wave${stats.waves === 1 ? '' : 's'} · biggest ${stats.biggest} · ${stats.captures} capture${stats.captures === 1 ? '' : 's'}`;
+      ($('play') as HTMLElement).textContent = 'Play again';
+      overlay.style.display = 'flex';
+    }
+
+    // ---------- AI ----------
+    // Troops already in flight toward each planet, per side.
+    function incoming() {
+      const inc1 = planets.map(() => 0);
+      const inc2 = planets.map(() => 0);
+      for (const f of fleets) (f.owner === 1 ? inc1 : inc2)[f.to] += f.count;
+      return { inc1, inc2 };
+    }
+
+    function aiTick() {
+      const mine = planets.map((_, i) => i).filter((i) => planets[i].owner === 2);
+      if (!mine.length) return;
+      // House + bocsimacko = the champion with a corrected world model:
+      // same strategy machinery, logistic growth in its simulations.
+      if (aiKind === 'bocsimacko') return aiBocsimacko();
+      if (house) return aiHouse(mine);
+      if (aiKind === 'random') return aiRandom(mine);
+      if (aiKind === 'greedy') return aiGreedy(mine);
+      aiSmart(mine);
+    }
+
+    function aiRandom(mine: number[]) {
+      if (Math.random() > 0.7) return;
+      const src = mine[Math.floor(Math.random() * mine.length)];
+      if (planets[src].troops < 8) return;
+      let dst = Math.floor(Math.random() * planets.length);
+      if (dst === src) dst = (dst + 1) % planets.length;
+      send([src], dst);
+    }
+
+    function aiGreedy(mine: number[]) {
+      const src = mine.reduce((a, b) => (planets[a].troops >= planets[b].troops ? a : b));
+      const half = Math.floor(planets[src].troops / 2);
+      if (half < 2) return;
+      // Cheapest-then-nearest affordable neutral; otherwise mug the weakest player planet.
+      const neutrals = planets
+        .map((_, i) => i)
+        .filter((i) => planets[i].owner === 0 && planets[i].troops + 1 <= half)
+        .sort((a, b) => planets[a].troops - planets[b].troops || dist(planets[src], planets[a]) - dist(planets[src], planets[b]));
+      if (neutrals.length) return send([src], neutrals[0]);
+      if (half < 20) return;
+      const targets = planets.map((_, i) => i).filter((i) => planets[i].owner === 1);
+      if (!targets.length) return;
+      send([src], targets.reduce((a, b) => (planets[a].troops <= planets[b].troops ? a : b)));
+    }
+
+    function aiSmart(mine: number[]) {
+      const { inc1, inc2 } = incoming();
+
+      // 1. Rescue: a planet about to fall gets half the nearest healthy garrison.
+      for (const m of mine) {
+        if (planets[m].troops + inc2[m] - inc1[m] >= -1) continue;
+        const helpers = mine
+          .filter((o) => o !== m && planets[o].troops > 10)
+          .sort((a, b) => dist(planets[a], planets[m]) - dist(planets[b], planets[m]));
+        if (helpers.length) return send([helpers[0]], m);
+      }
+
+      // 2. Attack the best production-per-cost target we can actually take.
+      const aggro = elapsed > 45 ? 1.4 : 0.75; // expand first, fight later
+      let best: { s: number; q: number; score: number } | null = null;
+      for (const s of mine) {
+        const half = Math.floor(planets[s].troops / 2);
+        if (half < 5) continue;
+        for (let q = 0; q < planets.length; q++) {
+          if (planets[q].owner === 2) continue;
+          const d = dist(planets[s], planets[q]);
+          const need =
+            planets[q].owner === 0
+              ? planets[q].troops - inc2[q] + inc1[q] + 1
+              : planets[q].troops + planets[q].prod * (d / SPEED) + inc1[q] - inc2[q] + 2;
+          if (need <= 0) continue; // an in-flight wave already has it handled
+          if (half < need * 1.05) continue;
+          const w = planets[q].owner === 1 ? aggro : 1;
+          const score = (planets[q].prod * w) / ((need + 4) * (0.35 + d));
+          if (!best || score > best.score) best = { s, q, score };
+        }
+      }
+      if (best) return send([best.s], best.q);
+
+      // 3. Nothing affordable: funnel the richest rear garrison to the front line.
+      if (mine.length < 2) return;
+      const rich = mine.reduce((a, b) => (planets[a].troops >= planets[b].troops ? a : b));
+      if (planets[rich].troops < 40) return;
+      const enemies = planets.filter((p) => p.owner === 1);
+      if (!enemies.length) return;
+      const toFront = (i: number) => Math.min(...enemies.map((e) => dist(planets[i], e)));
+      const front = mine.reduce((a, b) => (toFront(a) <= toFront(b) ? a : b));
+      if (front !== rich) send([rich], front);
+    }
+
+    // House-rules AI: aiSmart's bones, but saturation-aware. Production
+    // is wasted at full planets, so it sources attacks from its most
+    // saturated worlds, values targets it can grow into, and circulates
+    // idle garrisons toward the front instead of stockpiling.
+    function aiHouse(mine: number[]) {
+      const { inc1, inc2 } = incoming();
+      const sat = (i: number) => planets[i].troops / planets[i].cap;
+
+      // 1. Rescue, same as smart.
+      for (const m of mine) {
+        if (planets[m].troops + inc2[m] - inc1[m] >= -1) continue;
+        const helpers = mine
+          .filter((o) => o !== m && planets[o].troops > 10)
+          .sort((a, b) => dist(planets[a], planets[m]) - dist(planets[b], planets[m]));
+        if (helpers.length) return send([helpers[0]], m);
+      }
+
+      // 2. Closing phase: once clearly ahead, stop farming neutrals.
+      // Funnel halves into a staging planet near the weakest player world,
+      // then deliver one exact-count kill blow. Without this, the capped
+      // economy spreads thin and never finishes.
+      const playerIdx = planets.map((_, i) => i).filter((i) => planets[i].owner === 1);
+      if (mine.length >= 4 && mine.length >= 2 * playerIdx.length && playerIdx.length) {
+        const q = playerIdx.reduce((a, b) => (planets[a].troops <= planets[b].troops ? a : b));
+        const stage = mine.reduce((a, b) =>
+          dist(planets[a], planets[q]) <= dist(planets[b], planets[q]) ? a : b);
+        const tt = dist(planets[stage], planets[q]) / fleetSpeed(planets[q].troops);
+        const defGrowth = planets[q].prod * tt * Math.max(0, 1 - sat(q));
+        const need = planets[q].troops + defGrowth + inc1[q] - inc2[q] + 2;
+        if (need > 0) {
+          if (planets[stage].troops > need * 1.15) return sendExact(stage, q, Math.ceil(need * 1.1));
+          const feeders = mine
+            .filter((i) => i !== stage && planets[i].troops >= 10)
+            .sort((a, b) => sat(b) - sat(a))
+            .slice(0, 2);
+          if (feeders.length) return send(feeders, stage);
+        }
+      }
+
+      // 3. Attack: production-per-cost, weighted by source saturation
+      // (full planets push hardest — their growth is idling).
+      const aggro = elapsed > 40 ? 1.35 : 0.9;
+      let best: { s: number; q: number; score: number } | null = null;
+      for (const s of mine) {
+        const half = Math.floor(planets[s].troops / 2);
+        if (half < 4) continue;
+        for (let q = 0; q < planets.length; q++) {
+          if (planets[q].owner === 2) continue;
+          const d = dist(planets[s], planets[q]);
+          const tt = d / fleetSpeed(half);
+          const defGrowth = planets[q].owner === 1
+            ? planets[q].prod * tt * Math.max(0, 1 - sat(q)) // defenders near cap barely reinforce
+            : 0;
+          const need =
+            planets[q].owner === 0
+              ? planets[q].troops - inc2[q] + inc1[q] + 1
+              : planets[q].troops + defGrowth + inc1[q] - inc2[q] + 2;
+          if (need <= 0) continue;
+          if (half < need * 1.05) continue;
+          const w = (planets[q].owner === 1 ? aggro : 1) * (0.55 + sat(s));
+          const score = (planets[q].prod * w) / ((need + 4) * (0.35 + d));
+          if (!best || score > best.score) best = { s, q, score };
+        }
+      }
+      if (best) return send([best.s], best.q);
+
+      // 2b. Coordinated strike: caps mean no single planet can fund an
+      // attack, so combine the most saturated half-stacks. Without this
+      // the capped economy stalemates forever.
+      const srcs = mine
+        .filter((i) => Math.floor(planets[i].troops / 2) >= 3)
+        .sort((a, b) => sat(b) - sat(a))
+        .slice(0, 3);
+      if (srcs.length >= 2 && srcs.reduce((n, i) => n + sat(i), 0) / srcs.length > 0.4) {
+        const pool = srcs.reduce((n, i) => n + Math.floor(planets[i].troops / 2), 0);
+        let strike: { q: number; score: number } | null = null;
+        for (let q = 0; q < planets.length; q++) {
+          if (planets[q].owner === 2) continue;
+          const dAvg = srcs.reduce((n, i) => n + dist(planets[i], planets[q]), 0) / srcs.length;
+          const tt = dAvg / fleetSpeed(pool / srcs.length);
+          const defGrowth = planets[q].owner === 1 ? planets[q].prod * tt * Math.max(0, 1 - sat(q)) : 0;
+          const need =
+            planets[q].owner === 0
+              ? planets[q].troops - inc2[q] + inc1[q] + 1
+              : planets[q].troops + defGrowth + inc1[q] - inc2[q] + 2;
+          if (need <= 0 || pool < need * 1.15) continue;
+          const w = planets[q].owner === 1 ? aggro : 1;
+          const score = (planets[q].prod * w) / ((need + 4) * (0.35 + dAvg));
+          if (!strike || score > strike.score) strike = { q, score };
+        }
+        if (strike) return send(srcs, strike.q);
+      }
+
+      // 3. Circulate: dump the most saturated planet's excess into the
+      // emptiest own planet nearest the front. Never sit at cap.
+      if (mine.length < 2) return;
+      const richest = mine.reduce((a, b) => (sat(a) >= sat(b) ? a : b));
+      if (sat(richest) < 0.5) return;
+      const enemies = planets.filter((p) => p.owner === 1);
+      const toFront = (i: number) =>
+        enemies.length ? Math.min(...enemies.map((e) => dist(planets[i], e))) : 0;
+      const target = mine
+        .filter((i) => i !== richest)
+        .reduce((a, b) => (toFront(a) + 0.25 * sat(a) <= toFront(b) + 0.25 * sat(b) ? a : b));
+      send([richest], target);
+    }
+
+    // ==================================================================
+    // "bocsimacko" — port of Gábor Melis's Google AI Challenge 2010
+    // winner (Common Lisp → TS). The original is turn-based; we
+    // discretize continuous time into TICKs. Internally the AI is
+    // relabeled "player 1" so the original's player-1-centric logic
+    // ports sign-for-sign. Faithful: compute-future, cumulative-surplus,
+    // full-attack futures (with the famous MIN-TURN-TO-DEPART=2 trick),
+    // take-over-and-defend step targets incl. neutral-snipe timings,
+    // find-step (farthest sources first, synchronized arrivals), 1-ply
+    // move scoring, surplus redistribution. Omitted: the 4-ply
+    // alpha-beta opening, result caching, dynamic horizon.
+    // ==================================================================
+    const TICK = 0.5; // seconds per simulated "turn"
+    // Horizon in ticks. The original dynamically extended its horizon so
+    // neutral entry fees could amortize within view ("include the third
+    // least costly neutral that's safe to invest in"). We approximate
+    // with a fixed horizon — but house mode needs a longer one: logistic
+    // growth thins the margins, and with a short horizon the eval
+    // (correctly!) concludes that no investment ever pays back, and the
+    // bot freezes solid. 28 ticks validated for classic; 44 for house.
+    const HZ = house ? 44 : 28;
+
+    interface BSim {
+      P: number;
+      owner: number[]; // 0 neutral, 1 = AI ("us"), 2 = human ("them")
+      ships: number[];
+      growth: number[]; // per tick (max rate; house mode scales it logistically)
+      cap: number[]; // carrying capacity (house mode)
+      arr1: number[][]; // arrivals per tick, [planet][tick]
+      arr2: number[][];
+      dep1: number[][]; // planned departures per tick
+      dep2: number[][];
+      dt: number[][]; // travel time in ticks
+    }
+    interface BFut {
+      own: number[];
+      shp: number[];
+      bal: number; // ships them-lost-to-neutrals minus us-lost (us-positive)
+    }
+    interface BOrder {
+      src: number;
+      dst: number;
+      n: number;
+      t: number; // departure tick (0 = now)
+    }
+
+    const zrow = () => new Array(HZ).fill(0);
+
+    function bsimFromGame(): BSim {
+      const P = planets.length;
+      // Planning speed: house fleets vary with mass, so plan with a
+      // typical-wave speed; in-flight fleets below use their true ETA.
+      const planSpeed = fleetSpeed(30);
+      const sim: BSim = {
+        P,
+        owner: planets.map((p) => (p.owner === 2 ? 1 : p.owner === 1 ? 2 : 0)),
+        ships: planets.map((p) => p.troops),
+        growth: planets.map((p) => p.prod * TICK),
+        cap: planets.map((p) => p.cap),
+        arr1: planets.map(zrow),
+        arr2: planets.map(zrow),
+        dep1: planets.map(zrow),
+        dep2: planets.map(zrow),
+        dt: planets.map((a) => planets.map((b) => Math.max(1, Math.ceil(dist(a, b) / planSpeed / TICK)))),
+      };
+      for (const f of fleets) {
+        const tk = Math.min(HZ - 1, Math.max(1, Math.ceil(((1 - f.t) * f.dur) / TICK)));
+        (f.owner === 2 ? sim.arr1 : sim.arr2)[f.to][tk] += f.count;
+      }
+      return sim;
+    }
+
+    // resolve-battle: among (neutral c0, us c1, them c2) the largest force
+    // wins with (largest - second) ships; on a tie the incumbent keeps 0.
+    function resolveB(owner: number, c0: number, c1: number, c2: number): [number, number] {
+      let i0 = 0, i1 = 1, i2 = 2;
+      if (c0 < c1) { [c0, c1] = [c1, c0]; [i0, i1] = [i1, i0]; }
+      if (c1 < c2) {
+        [c1, c2] = [c2, c1]; [i1, i2] = [i2, i1];
+        if (c0 < c1) { [c0, c1] = [c1, c0]; [i0, i1] = [i1, i0]; }
+      }
+      return c0 > c1 ? [i0, c0 - c1] : [owner, 0];
+    }
+
+    type ResolveFn = (owner: number, c0: number, c1: number, c2: number, t: number) => [number, number];
+
+    // compute-future*: simulate one planet's timeline. Returns null in
+    // strict mode if a planned departure is impossible.
+    function computeFutureB(
+      sim: BSim, p: number,
+      arr1 = sim.arr1[p], arr2 = sim.arr2[p],
+      opts: { strict?: boolean; resolve?: ResolveFn } = {},
+    ): BFut | null {
+      const resolve = opts.resolve || ((o, c0, c1, c2) => resolveB(o, c0, c1, c2));
+      const own: number[] = new Array(HZ);
+      const shp: number[] = new Array(HZ);
+      let owner = sim.owner[p];
+      let ships = sim.ships[p];
+      let bal = 0;
+      for (let t = 0; t < HZ; t++) {
+        const a1 = arr1[t], a2 = arr2[t];
+        if (owner === 0) {
+          if (a1 || a2) {
+            bal -= Math.min(ships, a1);
+            bal += Math.min(ships, a2);
+            [owner, ships] = resolve(owner, ships, a1, a2, t);
+          }
+        } else if (owner === 1) {
+          ships += a1;
+          if (a2) [owner, ships] = resolve(1, 0, ships, a2, t);
+        } else {
+          ships += a2;
+          if (a1) [owner, ships] = resolve(2, 0, a1, ships, t);
+        }
+        own[t] = owner;
+        shp[t] = ships;
+        const d = owner === 1 ? sim.dep1[p][t] : owner === 2 ? sim.dep2[p][t] : 0;
+        if (owner !== 0) {
+          if (opts.strict && (ships - d < -1e-6 || (owner === 1 ? sim.dep2[p][t] : sim.dep1[p][t]) > 1e-6)) return null;
+          ships = Math.max(0, ships - d);
+          // House physics: logistic growth (idles at cap, decays above it).
+          ships += house ? sim.growth[p] * (1 - ships / sim.cap[p]) : sim.growth[p];
+        } else if (opts.strict && (sim.dep1[p][t] > 1e-6 || sim.dep2[p][t] > 1e-6)) {
+          return null;
+        }
+      }
+      return { own, shp, bal };
+    }
+
+    // cumulative-surplus: backward scan — ships that may leave at tick t
+    // without the planet ever falling afterwards. Us-positive, them-negative.
+    function cumSurplusB(
+      sim: BSim, p: number, fut: BFut,
+      includeAttacked: boolean, minT1 = 0, minT2 = 0,
+    ): number[] {
+      const sur = zrow();
+      const lastOwner = fut.own[HZ - 1];
+      let cur1 = INF, cur2 = INF, curOwner = -1;
+      for (let i = HZ - 1; i >= 0; i--) {
+        const owner = fut.own[i];
+        if (owner === 0 || (!includeAttacked && owner !== lastOwner)) break;
+        let eff = fut.shp[i] - (owner === 1 ? sim.dep1[p][i] : sim.dep2[p][i]);
+        if (eff < 0) eff = 0;
+        if (owner === 1) cur1 = Math.min(curOwner === 2 ? Math.max(0, cur1 - 1) : cur1, eff);
+        else cur2 = Math.min(curOwner === 1 ? Math.max(0, cur2 - 1) : cur2, eff);
+        curOwner = owner;
+        if (owner === 1 && i >= minT1) sur[i] = cur1;
+        if (owner === 2 && i >= minT2) sur[i] = -cur2;
+      }
+      return sur;
+    }
+
+    // uncumulate-surplus: per-tick increments assuming earlier surpluses left.
+    function uncumB(cum: number[]): number[] {
+      const s = cum.slice();
+      let sum = 0;
+      for (let j = 0; j < HZ; j++) {
+        if ((sum < 0 && s[j] > 0) || (sum > 0 && s[j] < 0)) sum = 0;
+        s[j] -= sum;
+        sum += s[j];
+      }
+      return s;
+    }
+
+    // add-surplus-into-arrivals: a neighbour T ticks away streams its
+    // surplus at the target, subject to earliest-departure/arrival limits.
+    function addSurplus(
+      sur: number[], a1: number[], a2: number[], T: number,
+      o: { cum?: boolean; minA1?: number; minA2?: number; minD1?: number; minD2?: number },
+    ) {
+      const mta1 = Math.max(T, o.minA1 || 0, (o.minD1 || 0) + T);
+      const mta2 = Math.max(T, o.minA2 || 0, (o.minD2 || 0) + T);
+      let sum1 = 0, sum2 = 0;
+      for (let i = T; i < HZ; i++) {
+        let s = sur[i - T];
+        if (i === mta1 && !o.cum) s += sum1;
+        if (i === mta2 && !o.cum) s += sum2;
+        if (s > 0) {
+          if (i < mta1) sum1 += s;
+          else a1[i] += s;
+        } else if (s < 0) {
+          if (i < mta2) sum2 += s;
+          else a2[i] -= s;
+        }
+      }
+    }
+
+    // compute-full-attack-arrivals: everyone streams surplus at planet p.
+    function fafArrivals(
+      sim: BSim, p: number, surs: (number[] | null)[],
+      o: { addNormal?: boolean; cum?: boolean; minA1?: number; minA2?: number; minD1?: number; minD2?: number } = {},
+    ): [number[], number[]] {
+      const a1 = o.addNormal ? sim.arr1[p].slice() : zrow();
+      const a2 = o.addNormal ? sim.arr2[p].slice() : zrow();
+      for (let q = 0; q < sim.P; q++) {
+        if (q === p || !surs[q]) continue;
+        addSurplus(surs[q]!, a1, a2, sim.dt[q][p], o);
+      }
+      return [a1, a2];
+    }
+
+    function fafFuture(
+      sim: BSim, p: number, surs: (number[] | null)[],
+      o: { minA1?: number; minA2?: number; minD1?: number; minD2?: number } = {},
+    ): BFut {
+      const [a1, a2] = fafArrivals(sim, p, surs, { ...o, addNormal: true });
+      return computeFutureB(sim, p, a1, a2)!;
+    }
+
+    // score: growth-ticks captured by us minus theirs, plus the balance of
+    // ships burned on neutrals. Nominal growth even in house mode: this is
+    // applied to full-attack futures, and realized-growth scoring there
+    // double-counts pessimism (the hypothetical enemy conquers our emptied
+    // planets at maximum production value) — every move evals ~-75 and the
+    // bot freezes solid. The circulation incentive lives in scoreRealized.
+    function scoreB(sim: BSim, p: number, fut: BFut): number {
+      let s = fut.bal;
+      for (let t = 0; t < HZ; t++) {
+        if (fut.own[t] === 1) s += sim.growth[p];
+        else if (fut.own[t] === 2) s -= sim.growth[p];
+      }
+      return s;
+    }
+
+    // House utilization term, computed on NORMAL futures only (stable
+    // ownership, no hypothetical streams): realized production — a planet
+    // sitting at cap earns nothing, so circulation scores.
+    function scoreRealized(sim: BSim, p: number, fut: BFut): number {
+      let s = 0;
+      for (let t = 0; t < HZ; t++) {
+        const g = sim.growth[p] * (1 - fut.shp[t] / sim.cap[p]);
+        if (fut.own[t] === 1) s += g;
+        else if (fut.own[t] === 2) s -= g;
+      }
+      return s;
+    }
+
+    function firstNonNeutralTurn(fut: BFut): number {
+      for (let t = 0; t < HZ; t++) if (fut.own[t] !== 0) return t;
+      return -1;
+    }
+
+    // evaluate/full-attack with eval*'s asymmetric departure delays: our
+    // ships can't leave for 2 ticks (no reliance on instant reactions);
+    // theirs can leave immediately. The one-character championship trick.
+    function evalB(sim: BSim): number {
+      const futs = planets.map((_, p) => computeFutureB(sim, p)!);
+      const surs = futs.map((f, p) => (f.own[HZ - 1] === 0 ? null : uncumB(cumSurplusB(sim, p, f, false))));
+      let total = 0;
+      for (let p = 0; p < sim.P; p++) {
+        const fut = futs[p];
+        if (house) total += scoreRealized(sim, p, fut);
+        if (fut.own[HZ - 1] === 0) {
+          // Still neutral at the horizon: tiny tie-break only ("who would
+          // win the race"), real value appears when a move captures it.
+          total += fut.bal + 1e-3 * scoreB(sim, p, fafFuture(sim, p, surs, { minD1: 2 }));
+        } else {
+          // Snipe-aware candidate arrival timings; score pessimistically.
+          const cands = [0];
+          if (sim.owner[p] === 0 && sim.ships[p] > sim.growth[p]) {
+            const fnn = firstNonNeutralTurn(fut);
+            if (fnn > 0) {
+              if (!cands.includes(fnn)) cands.push(fnn);
+              if (!cands.includes(fnn + 1)) cands.push(fnn + 1);
+            }
+          }
+          let worst = Infinity;
+          for (const mta of cands) {
+            const f = fafFuture(sim, p, surs, { minA1: mta, minA2: mta, minD1: 2 });
+            worst = Math.min(worst, scoreB(sim, p, { own: f.own, shp: f.shp, bal: fut.bal }));
+          }
+          total += worst;
+        }
+      }
+      return total;
+    }
+
+    // find-first-possible-takeover-opportunity
+    function findTakeover(
+      fut: BFut, cpaMine: number[], cpaTheirs: number[], minArrive: number, sure: boolean,
+    ): { n: number; turn: number } | null {
+      for (let turn = Math.max(1, minArrive); turn < HZ; turn++) {
+        const own = fut.own[turn];
+        const ns = fut.shp[turn];
+        if (own === 1) continue;
+        if (!sure) {
+          if (ns < cpaMine[turn]) return { n: ns + 1, turn };
+        } else {
+          if (own === 0 && turn + 1 < HZ && ns < cpaMine[turn] && cpaTheirs[turn + 1] < cpaMine[turn]) {
+            return { n: 1 + Math.max(cpaTheirs[turn + 1], ns), turn };
+          }
+          if (own === 2 && ns + cpaTheirs[turn] < cpaMine[turn]) {
+            return { n: 1 + ns + cpaTheirs[turn], turn };
+          }
+        }
+      }
+      return null;
+    }
+
+    // maybe-take-over-and-defend: replay the future with a cheating battle
+    // resolver that records exactly the arrivals needed to win every fight
+    // at/after minArrive, bounded by what our planets could deliver (cpa).
+    function takeOverAndDefend(
+      sim: BSim, p: number, fut: BFut,
+      cpaMine: number[], cpaTheirs: number[],
+      minArrive: number, sure: boolean,
+    ): number[] | null {
+      const cheat = zrow();
+      const arrStar = sim.arr1[p].slice();
+      let used = 0;
+      let minA = minArrive;
+      if (fut.own[minArrive] !== 1) {
+        const opp = findTakeover(fut, cpaMine, cpaTheirs, minArrive, sure);
+        if (sure) {
+          const plain = findTakeover(fut, cpaMine, cpaTheirs, minArrive, false);
+          if (opp && plain && opp.n === plain.n && opp.turn === plain.turn) return null; // adds nothing over the non-sure step
+        }
+        if (opp) {
+          minA = opp.turn + 1;
+          cheat[opp.turn] += opp.n;
+          arrStar[opp.turn] += opp.n;
+          used += opp.n;
+        }
+      }
+      computeFutureB(sim, p, arrStar, sim.arr2[p], {
+        resolve: (owner, c0, c1, c2, t) => {
+          const [no, ns] = resolveB(owner, c0, c1, c2);
+          if (t >= minA && no !== 1 && ns <= cpaMine[t] - used) {
+            cheat[t] += ns;
+            used += ns;
+            return [1, 0];
+          }
+          return [no, ns];
+        },
+      });
+      return used > 0 ? cheat : null;
+    }
+
+    // find-neutral-steal: first tick the enemy would own a currently
+    // neutral planet — arriving one tick later snipes their investment.
+    function findNeutralSteal(sim: BSim, p: number, fut: BFut): number | null {
+      if (sim.owner[p] !== 0) return null;
+      for (let t = 0; t < HZ; t++) if (fut.own[t] === 2) return t;
+      return null;
+    }
+
+    // find-step: source the needed arrivals from cumulative surpluses,
+    // farthest planets first (cheap reinforcements stay flexible).
+    function findStep(sim: BSim, cumSurs: number[][], dst: number, target: number[]): BOrder[] {
+      const used = new Array(sim.P).fill(0);
+      const step: BOrder[] = [];
+      for (let t = 0; t < HZ; t++) {
+        let need = target[t];
+        if (need <= 0) continue;
+        const orders: BOrder[] = [];
+        const srcs = [];
+        for (let q = 0; q < sim.P; q++) if (q !== dst && sim.dt[q][dst] <= t) srcs.push(q);
+        srcs.sort((a, b) => sim.dt[b][dst] - sim.dt[a][dst]);
+        for (const q of srcs) {
+          const t0 = t - sim.dt[q][dst];
+          const avail = cumSurs[q][t0] - used[q]; // us-positive by convention
+          const n = Math.min(avail, need);
+          if (n > 0.5) {
+            orders.push({ src: q, dst, n, t: t0 });
+            need -= n;
+            used[q] += n;
+          }
+        }
+        if (need <= 0.5) step.push(...orders);
+        else return step; // can't satisfy this tick: keep what's complete
+      }
+      return step;
+    }
+
+    function applyOrders(sim: BSim, orders: BOrder[]): BSim {
+      const out: BSim = {
+        ...sim,
+        arr1: sim.arr1.map((r) => r.slice()),
+        dep1: sim.dep1.map((r) => r.slice()),
+      };
+      for (const o of orders) {
+        out.dep1[o.src][o.t] += o.n;
+        out.arr1[o.dst][Math.min(HZ - 1, o.t + sim.dt[o.src][o.dst])] += o.n;
+      }
+      return out;
+    }
+
+    function validMove(sim: BSim, orders: BOrder[]): boolean {
+      const s = applyOrders(sim, orders);
+      const involved = new Set<number>();
+      for (const o of orders) { involved.add(o.src); involved.add(o.dst); }
+      for (const p of involved) if (!computeFutureB(s, p, undefined, undefined, { strict: true })) return false;
+      return true;
+    }
+
+    // generate-candidate-steps + score + combine (1-ply, like the original
+    // after its opening phase).
+    function aiBocsimacko() {
+      // Opening phase (house mode). The original switched algorithms here
+      // too — 4-ply alpha-beta "until the third planet is captured" —
+      // because the 1-ply full-attack eval is unreliable while all force
+      // sits on one or two planets: the everyone-attacks-everything
+      // assumption is maximally distorting, every spend looks like losing
+      // home, and the bot freezes. Probe data: best move ~-50 vs baseline
+      // +0.2 with one planet. We use greedy expansion instead of the
+      // alpha-beta book; the eval machinery takes over from 3 planets.
+      if (house) {
+        const mine = planets.map((_, i) => i).filter((i) => planets[i].owner === 2);
+        if (mine.length < 3) {
+          const { inc1, inc2 } = incoming();
+          const src = mine.reduce((a, b) => (planets[a].troops >= planets[b].troops ? a : b));
+          let pick: { q: number; need: number; score: number } | null = null;
+          for (let q = 0; q < planets.length; q++) {
+            if (planets[q].owner !== 0) continue;
+            const need = planets[q].troops - inc2[q] + inc1[q] + 1;
+            if (need <= 0) continue;
+            if (planets[src].troops * 0.75 < need * 1.1) continue; // keep a home guard
+            const score = planets[q].prod / ((need + 3) * (0.35 + dist(planets[src], planets[q])));
+            if (!pick || score > pick.score) pick = { q, need, score };
+          }
+          if (pick) sendExact(src, pick.q, Math.ceil(pick.need * 1.1));
+          return;
+        }
+      }
+      const sim = bsimFromGame();
+      const futs = planets.map((_, p) => computeFutureB(sim, p)!);
+      // Optimistic surpluses for sourcing: theirs only counts from tick 1.
+      const cumSurs = planets.map((_, p) => cumSurplusB(sim, p, futs[p], true, 0, 1));
+      const surs = cumSurs.map(uncumB);
+      const steps: BOrder[][] = [];
+
+      for (let p = 0; p < sim.P; p++) {
+        const faf = fafFuture(sim, p, surs);
+        if (!faf.own.includes(1)) continue; // not takeable even in a full attack
+        const [cpaMine, cpaTheirs] = fafArrivals(sim, p, cumSurs, { addNormal: false, cum: true });
+        const targets: (number[] | null)[] = [
+          takeOverAndDefend(sim, p, futs[p], cpaMine, cpaTheirs, 0, false),
+          takeOverAndDefend(sim, p, futs[p], cpaMine, cpaTheirs, 0, true),
+        ];
+        const stealTurn = findNeutralSteal(sim, p, futs[p]);
+        if (stealTurn !== null && sim.ships[p] > sim.growth[p]) {
+          targets.push(takeOverAndDefend(sim, p, futs[p], cpaMine, cpaTheirs, stealTurn + 1, false));
+        }
+        for (const target of targets) {
+          if (!target) continue;
+          const step = findStep(sim, cumSurs, p, target);
+          if (step.length) steps.push(step);
+        }
+        // Redistribute: stream today's surplus from rear planets here.
+        if (futs[p].own[HZ - 1] === 1) {
+          for (let q = 0; q < sim.P; q++) {
+            const sur = surs[q][0];
+            if (q !== p && sim.owner[q] === 1 && sur > 0.5 && sim.dt[q][p] < HZ) {
+              steps.push([{ src: q, dst: p, n: sur, t: 0 }]);
+            }
+          }
+        }
+      }
+      // Planner diagnostics for headless tests / the future x-ray mode.
+      const dbg = ((root as any).__pwPlan = { steps: steps.length, scored: 0, best: 0, baseline: 0, sent: false });
+      if (!steps.length) return;
+
+      const scored = steps
+        .map((step) => ({ step, score: validMove(sim, step) ? evalB(applyOrders(sim, step)) : -Infinity }))
+        .filter((s) => s.score > -Infinity)
+        .sort((a, b) => b.score - a.score);
+      dbg.scored = scored.length;
+      if (!scored.length) return;
+
+      // Greedily merge compatible steps into composite moves, best-first.
+      const moves: { step: BOrder[]; score: number }[] = [...scored];
+      for (let i = 0; i < Math.min(5, scored.length); i++) {
+        let move = scored[i].step;
+        for (let j = i + 1; j < scored.length; j++) {
+          const combo = [...move, ...scored[j].step];
+          if (validMove(sim, combo)) {
+            move = combo;
+            moves.push({ step: move, score: evalB(applyOrders(sim, move)) });
+          }
+        }
+      }
+      moves.sort((a, b) => b.score - a.score);
+
+      // Only this tick's orders are real; the rest is replanned next tick,
+      // exactly like the original resubmitting each turn.
+      const baseline = evalB(sim);
+      const best = moves[0];
+      dbg.best = best.score;
+      dbg.baseline = baseline;
+      if (best.score <= baseline + 1e-9) return; // doing nothing is a move too
+      dbg.sent = true;
+      for (const o of best.step) {
+        if (o.t === 0 && planets[o.src].owner === 2) sendExact(o.src, o.dst, o.n);
+      }
+    }
+
+    // ---------- rendering ----------
+    function setSize() {
+      const stage = canvas.parentElement!;
+      let cssW = stage.clientWidth;
+      // Fullscreen: fit the fixed-aspect map inside the stage (letterbox).
+      if (document.fullscreenElement === root) {
+        cssW = Math.min(cssW, Math.floor(stage.clientHeight / ASPECT));
+      }
+      if (cssW < 10) return;
+      W = cssW;
+      const cssH = Math.round(cssW * ASPECT);
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(cssW * dpr);
+      canvas.height = Math.round(cssH * dpr);
+      canvas.style.width = `${cssW}px`;
+      canvas.style.height = `${cssH}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, W * ASPECT);
+      const now = performance.now();
+
+      for (let i = 0; i < planets.length; i++) {
+        const p = planets[i];
+        const x = p.x * W;
+        const y = p.y * W;
+        const r = p.r * W;
+
+        ctx.save();
+        if (p.owner === 0) {
+          ctx.fillStyle = '#e2e8f0';
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          ctx.shadowColor = GLOW[p.owner];
+          ctx.shadowBlur = 14;
+          ctx.fillStyle = COLOR[p.owner];
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+
+        // House mode: capacity ring — how close this planet is to idle.
+        if (house && p.owner !== 0) {
+          const fill = Math.min(1, p.troops / p.cap);
+          ctx.save();
+          ctx.strokeStyle = COLOR[p.owner];
+          ctx.globalAlpha = 0.18;
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(x, y, r + 3.5, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = fill >= 1 ? 0.9 : 0.55;
+          ctx.beginPath();
+          ctx.arc(x, y, r + 3.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fill);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        if (selection.has(i) || (hoverPlanet === i && p.owner === 1 && state === 'running')) {
+          ctx.save();
+          ctx.strokeStyle = COLOR[1];
+          ctx.lineWidth = selection.has(i) ? 2 : 1;
+          ctx.setLineDash([4, 4]);
+          ctx.lineDashOffset = -(now / 60) % 8;
+          ctx.beginPath();
+          ctx.arc(x, y, r + (house ? 8 : 5), 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        ctx.fillStyle = p.owner === 0 ? '#64748b' : '#fff';
+        ctx.font = `700 ${Math.max(10, r * 0.62)}px Atkinson, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(Math.floor(p.troops)), x, y + 1);
+      }
+
+      // Supply routes: marching-ants arrows between linked planets.
+      if (house) {
+        for (const [s, d] of routes) {
+          const a = planets[s];
+          const b = planets[d];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const len = Math.hypot(dx, dy) || 1;
+          const ux = dx / len;
+          const uy = dy / len;
+          const x1 = (a.x + ux * (a.r + 0.012)) * W;
+          const y1 = (a.y + uy * (a.r + 0.012)) * W;
+          const x2 = (b.x - ux * (b.r + 0.014)) * W;
+          const y2 = (b.y - uy * (b.r + 0.014)) * W;
+          ctx.save();
+          ctx.strokeStyle = 'rgba(99,102,241,0.35)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([3, 5]);
+          ctx.lineDashOffset = -(now / 40) % 8; // ants march toward the destination
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = 'rgba(99,102,241,0.5)';
+          ctx.beginPath();
+          ctx.moveTo(x2, y2);
+          ctx.lineTo(x2 - (ux * 7 - uy * 4), y2 - (uy * 7 + ux * 4));
+          ctx.lineTo(x2 - (ux * 7 + uy * 4), y2 - (uy * 7 - ux * 4));
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      // Drag preview: dashed lines from every sender to the pointer.
+      if (dragging && pointerIn && downPlanet >= 0) {
+        const senders = new Set(selection);
+        senders.add(downPlanet);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(99,102,241,0.45)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        for (const s of senders) {
+          ctx.beginPath();
+          ctx.moveTo(planets[s].x * W, planets[s].y * W);
+          ctx.lineTo(pointerX, pointerY);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        if (hoverPlanet >= 0 && hoverPlanet !== downPlanet) {
+          const t = planets[hoverPlanet];
+          ctx.beginPath();
+          ctx.arc(t.x * W, t.y * W, t.r * W + 5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      for (const f of fleets) {
+        const a = planets[f.from];
+        const b = planets[f.to];
+        // Ease departure/arrival so fleets visually clear the planet rims.
+        const x = (a.x + (b.x - a.x) * f.t) * W;
+        const y = (a.y + (b.y - a.y) * f.t) * W;
+        const r = Math.min(11, 3.5 + Math.sqrt(f.count) * 0.8);
+        ctx.save();
+        ctx.shadowColor = GLOW[f.owner];
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = COLOR[f.owner];
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ctx.font = '700 10px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(248,250,252,0.9)';
+        ctx.strokeText(String(f.count), x, y - r - 2);
+        ctx.fillStyle = COLOR[f.owner];
+        ctx.fillText(String(f.count), x, y - r - 2);
+      }
+    }
+
+    function updateHud() {
+      const total = { 1: 0, 2: 0, 0: 0 } as Record<number, number>;
+      for (const p of planets) total[p.owner] += p.troops;
+      for (const f of fleets) total[f.owner] += f.count;
+      const sum = Math.max(1, total[0] + total[1] + total[2]);
+      $('pcount').textContent = String(Math.floor(total[1]));
+      $('ecount').textContent = String(Math.floor(total[2]));
+      $('pbar').style.width = `${(total[1] / sum) * 100}%`;
+      $('ebar').style.width = `${(total[2] / sum) * 100}%`;
+    }
+
+    // ---------- input ----------
+    function planetAt(x: number, y: number) {
+      for (let i = 0; i < planets.length; i++) {
+        const p = planets[i];
+        const hit = Math.max(p.r * W, 14) + 4; // fat-finger friendly
+        if (Math.hypot(p.x * W - x, p.y * W - y) <= hit) return i;
+      }
+      return -1;
+    }
+
+    function localXY(e: PointerEvent) {
+      const rect = canvas.getBoundingClientRect();
+      return [e.clientX - rect.left, e.clientY - rect.top];
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (state !== 'running') return;
+      e.preventDefault();
+      canvas.setPointerCapture(e.pointerId);
+      [downX, downY] = localXY(e);
+      pointerX = downX;
+      pointerY = downY;
+      pointerIn = true;
+      downPlanet = planetAt(downX, downY);
+      dragging = false;
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      [pointerX, pointerY] = localXY(e);
+      pointerIn = true;
+      hoverPlanet = planetAt(pointerX, pointerY);
+      if (downPlanet >= 0 && planets[downPlanet].owner === 1 && Math.hypot(pointerX - downX, pointerY - downY) > 10) {
+        dragging = true;
+      }
+      canvas.style.cursor =
+        hoverPlanet >= 0 && (planets[hoverPlanet].owner === 1 || selection.size || dragging) ? 'pointer' : 'default';
+    });
+
+    canvas.addEventListener('pointerleave', () => {
+      pointerIn = false;
+      hoverPlanet = -1;
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+      if (state !== 'running') return;
+      const [x, y] = localXY(e);
+      const up = planetAt(x, y);
+
+      if (downPlanet >= 0 && planets[downPlanet].owner === 1) {
+        if (dragging) {
+          if (up >= 0 && up !== downPlanet) {
+            if (house && planets[up].owner === 1) {
+              // Drag between your own planets: toggle a supply route.
+              if (routes.get(downPlanet) === up) routes.delete(downPlanet);
+              else routes.set(downPlanet, up);
+            } else {
+              send([...selection, downPlanet], up);
+            }
+            selection.clear();
+          }
+        } else {
+          const now = performance.now();
+          if (lastTap.i === downPlanet && now - lastTap.t < 320) {
+            planets.forEach((p, i) => p.owner === 1 && selection.add(i));
+          } else if (selection.has(downPlanet)) {
+            selection.delete(downPlanet);
+          } else {
+            selection.add(downPlanet);
+          }
+          lastTap = { i: downPlanet, t: now };
+        }
+      } else if (up >= 0 && planets[up].owner !== 1 && selection.size) {
+        send([...selection], up);
+        selection.clear();
+      } else if (up < 0) {
+        selection.clear();
+      }
+
+      downPlanet = -1;
+      dragging = false;
+    });
+
+    canvas.addEventListener('pointercancel', () => {
+      downPlanet = -1;
+      dragging = false;
+    });
+
+    $('play').addEventListener('click', () => {
+      if (state === 'over') reset(true);
+      else {
+        state = 'running';
+        overlay.style.display = 'none';
+      }
+    });
+    $('reset').addEventListener('click', () => reset(true));
+
+    // ---------- fullscreen ----------
+    const fsBtn = $('fs');
+    if (!document.fullscreenEnabled) {
+      fsBtn.style.display = 'none'; // e.g. iPhone Safari
+    } else {
+      fsBtn.addEventListener('click', () => {
+        if (document.fullscreenElement === root) document.exitFullscreen();
+        else root.requestFullscreen();
+      });
+      document.addEventListener('fullscreenchange', () => {
+        const fs = document.fullscreenElement === root;
+        $('fs-expand').classList.toggle('hidden', fs);
+        $('fs-compress').classList.toggle('hidden', !fs);
+        fsBtn.title = fs ? 'Exit fullscreen' : 'Fullscreen';
+        setSize();
+      });
+    }
+
+    // ---------- send-rate picker (house mode) ----------
+    const ratesEl = root.querySelector<HTMLElement>('[data-pw="rates"]');
+    function paintRates() {
+      ratesEl?.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
+        const active = Number(b.dataset.rate) / 100 === sendRate;
+        b.classList.toggle('bg-indigo-600', active);
+        b.classList.toggle('text-white', active);
+        b.classList.toggle('text-gray-500', !active);
+      });
+    }
+    ratesEl?.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
+      b.addEventListener('click', () => {
+        sendRate = Number(b.dataset.rate) / 100;
+        paintRates();
+      });
+    });
+    paintRates();
+
+    // ---------- main loop ----------
+    function frame(now: number) {
+      const dt = Math.min(0.05, (now - last) / 1000) || 0;
+      last = now;
+      if (state === 'running') {
+        updateTimeScale();
+        update(dt * timeScale);
+        updateHud();
+      }
+      draw();
+      raf = requestAnimationFrame(frame);
+    }
+
+    // Debug/test handle (used by headless playtests and the future arena).
+    (root as any).__pw = {
+      hz: HZ,
+      get planets() { return planets; },
+      get fleets() { return fleets; },
+      get routes() { return routes; },
+      get state() { return state; },
+      get stats() { return { ...stats, elapsed }; },
+    };
+
+    new ResizeObserver(setSize).observe(canvas.parentElement!);
+    setSize();
+    reset(false);
+    raf = requestAnimationFrame(frame);
+  }
+</script>

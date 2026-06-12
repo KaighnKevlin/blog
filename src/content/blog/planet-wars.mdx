@@ -1,0 +1,19 @@
+---
+title: "Planet Wars"
+description: "A Galcon-style real-time strategy game with a ladder of six AIs to beat, including a port of the 2010 Google AI Challenge winner."
+pubDate: "Jun 12 2026"
+---
+
+import PlanetWars from '../../components/PlanetWars.astro';
+
+<PlanetWars ai="random" title="Rung 1 — Random" />
+
+<PlanetWars ai="greedy" title="Rung 2 — Greedy" />
+
+<PlanetWars ai="smart" title="Rung 3 — Smart" />
+
+<PlanetWars ai="bocsimacko" title="Rung 4 — Bocsimacko" />
+
+<PlanetWars mode="house" title="Rung 5 — New Rules" />
+
+<PlanetWars mode="house" ai="bocsimacko" title="Rung 6 — Bocsimacko, Retrained" />
