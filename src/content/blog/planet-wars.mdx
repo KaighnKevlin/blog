@@ -38,4 +38,12 @@ The ring around each planet shows how close it is to idling. Full ring = wasted 
 
 <PlanetWars mode="house" title="Rung 5 — New Rules" subtitle="full planets stop growing. keep moving." />
 
+## Rung 6: the champion, retrained
+
+Here's the experiment that justifies this whole post. Bocsimacko's strength was never a bag of tricks — it was an *architecture*: simulate every planet's future, compute what's safe to spend, evaluate positions by simulated production. That architecture doesn't care what the physics are. It only "believed" in infinite stockpiles because its simulator said so.
+
+So I changed **three lines of its world model** — growth is logistic in its futures, captured production is scored as *realized* output (a full planet is worth nothing per tick), and fleet ETAs account for mass — and touched nothing else. No new strategy. No house-rules special cases. The 2010 champion just *re-derives* correct play in an economy it has never seen: it circulates garrisons because its own eval now says hoarding scores zero, and it still runs its synchronized multi-planet strikes and neutral snipes, because those were never about the growth curve.
+
+<PlanetWars mode="house" ai="bocsimacko" title="Rung 6 — Bocsimacko, Retrained" subtitle="same 2010 strategy. corrected physics. good luck." />
+
 *(More copy to come: why minimax fails without turns, futures & surpluses, the snipe, the one-character parameter change that won the whole thing, and why rung 5's economics are just diminishing marginal returns.)*

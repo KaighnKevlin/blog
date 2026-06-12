@@ -329,7 +329,7 @@ const {
       }
 
       aiTimer += dt;
-      if (aiTimer >= AI_INTERVAL[house ? 'house' : aiKind]) {
+      if (aiTimer >= AI_INTERVAL[house && aiKind !== 'bocsimacko' ? 'house' : aiKind]) {
         aiTimer = 0;
         aiTick();
       }
@@ -379,10 +379,12 @@ const {
     function aiTick() {
       const mine = planets.map((_, i) => i).filter((i) => planets[i].owner === 2);
       if (!mine.length) return;
+      // House + bocsimacko = the champion with a corrected world model:
+      // same strategy machinery, logistic growth in its simulations.
+      if (aiKind === 'bocsimacko') return aiBocsimacko();
       if (house) return aiHouse(mine);
       if (aiKind === 'random') return aiRandom(mine);
       if (aiKind === 'greedy') return aiGreedy(mine);
-      if (aiKind === 'bocsimacko') return aiBocsimacko();
       aiSmart(mine);
     }
 
@@ -576,13 +578,21 @@ const {
     // alpha-beta opening, result caching, dynamic horizon.
     // ==================================================================
     const TICK = 0.5; // seconds per simulated "turn"
-    const HZ = 28; // horizon in ticks (~14s lookahead)
+    // Horizon in ticks. The original dynamically extended its horizon so
+    // neutral entry fees could amortize within view ("include the third
+    // least costly neutral that's safe to invest in"). We approximate
+    // with a fixed horizon — but house mode needs a longer one: logistic
+    // growth thins the margins, and with a short horizon the eval
+    // (correctly!) concludes that no investment ever pays back, and the
+    // bot freezes solid. 28 ticks validated for classic; 44 for house.
+    const HZ = house ? 44 : 28;
 
     interface BSim {
       P: number;
       owner: number[]; // 0 neutral, 1 = AI ("us"), 2 = human ("them")
       ships: number[];
-      growth: number[]; // per tick
+      growth: number[]; // per tick (max rate; house mode scales it logistically)
+      cap: number[]; // carrying capacity (house mode)
       arr1: number[][]; // arrivals per tick, [planet][tick]
       arr2: number[][];
       dep1: number[][]; // planned departures per tick
@@ -605,16 +615,20 @@ const {
 
     function bsimFromGame(): BSim {
       const P = planets.length;
+      // Planning speed: house fleets vary with mass, so plan with a
+      // typical-wave speed; in-flight fleets below use their true ETA.
+      const planSpeed = fleetSpeed(30);
       const sim: BSim = {
         P,
         owner: planets.map((p) => (p.owner === 2 ? 1 : p.owner === 1 ? 2 : 0)),
         ships: planets.map((p) => p.troops),
         growth: planets.map((p) => p.prod * TICK),
+        cap: planets.map((p) => p.cap),
         arr1: planets.map(zrow),
         arr2: planets.map(zrow),
         dep1: planets.map(zrow),
         dep2: planets.map(zrow),
-        dt: planets.map((a) => planets.map((b) => Math.max(1, Math.ceil(dist(a, b) / SPEED / TICK)))),
+        dt: planets.map((a) => planets.map((b) => Math.max(1, Math.ceil(dist(a, b) / planSpeed / TICK)))),
       };
       for (const f of fleets) {
         const tk = Math.min(HZ - 1, Math.max(1, Math.ceil(((1 - f.t) * f.dur) / TICK)));
@@ -670,7 +684,9 @@ const {
         const d = owner === 1 ? sim.dep1[p][t] : owner === 2 ? sim.dep2[p][t] : 0;
         if (owner !== 0) {
           if (opts.strict && (ships - d < -1e-6 || (owner === 1 ? sim.dep2[p][t] : sim.dep1[p][t]) > 1e-6)) return null;
-          ships = Math.max(0, ships - d) + sim.growth[p];
+          ships = Math.max(0, ships - d);
+          // House physics: logistic growth (idles at cap, decays above it).
+          ships += house ? sim.growth[p] * (1 - ships / sim.cap[p]) : sim.growth[p];
         } else if (opts.strict && (sim.dep1[p][t] > 1e-6 || sim.dep2[p][t] > 1e-6)) {
           return null;
         }
@@ -759,12 +775,15 @@ const {
     }
 
     // score: growth-ticks captured by us minus theirs, plus the balance of
-    // ships burned on neutrals.
+    // ships burned on neutrals. House mode scores *realized* production —
+    // a planet sitting at cap is worth nothing per tick, so the eval
+    // natively prefers futures where our garrisons circulate.
     function scoreB(sim: BSim, p: number, fut: BFut): number {
       let s = fut.bal;
       for (let t = 0; t < HZ; t++) {
-        if (fut.own[t] === 1) s += sim.growth[p];
-        else if (fut.own[t] === 2) s -= sim.growth[p];
+        const g = house ? sim.growth[p] * (1 - fut.shp[t] / sim.cap[p]) : sim.growth[p];
+        if (fut.own[t] === 1) s += g;
+        else if (fut.own[t] === 2) s -= g;
       }
       return s;
     }
