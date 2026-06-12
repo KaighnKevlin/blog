@@ -40,9 +40,13 @@ The ring around each planet shows how close it is to idling. Full ring = wasted 
 
 ## Rung 6: the champion, retrained
 
-Here's the experiment that justifies this whole post. Bocsimacko's strength was never a bag of tricks — it was an *architecture*: simulate every planet's future, compute what's safe to spend, evaluate positions by simulated production. That architecture doesn't care what the physics are. It only "believed" in infinite stockpiles because its simulator said so.
+Here's the experiment that justifies this whole post. Bocsimacko's strength was never a bag of tricks — it was an *architecture*: simulate every planet's future, compute what's safe to spend, evaluate positions by simulated production. That architecture shouldn't care what the physics are. It only "believed" in infinite stockpiles because its simulator said so.
 
-So I changed **three lines of its world model** — growth is logistic in its futures, captured production is scored as *realized* output (a full planet is worth nothing per tick), and fleet ETAs account for mass — and touched nothing else. No new strategy. No house-rules special cases. The 2010 champion just *re-derives* correct play in an economy it has never seen: it circulates garrisons because its own eval now says hoarding scores zero, and it still runs its synchronized multi-planet strikes and neutral snipes, because those were never about the growth curve.
+So I taught its world model the new physics — logistic growth in its futures, a utilization term so hoarding scores zero, mass-aware fleet ETAs — and the champion... **froze solid**. Two minutes, zero moves, its own planet idling at 93% capacity. The bot built to punish turtling became the purest turtle on the ladder.
+
+The debugging was a tour of why the original's weird-looking design choices existed. My first eval scored *realized* production inside the full-attack futures — double-counting pessimism, since the hypothetical enemy now conquers your emptied planets at maximum production value (every possible move evaluated ~75 points worse than sitting still; sitting still was *optimal*). And with all your force on one planet, the full-attack assumption — everyone attacks everything, everywhere, simultaneously — is maximally distorting, which is exactly why Melis ran a *different algorithm* for the opening ("until the third planet is captured") and I'd skipped it as an unimportant detail. It was not an unimportant detail.
+
+With the eval fixed and the opening phase restored, the architecture transfers for real: it circulates garrisons because its eval says hoarding earns nothing, and it still runs its synchronized multi-planet strikes and snipes, because those were never about the growth curve.
 
 <PlanetWars mode="house" ai="bocsimacko" title="Rung 6 — Bocsimacko, Retrained" subtitle="same 2010 strategy. corrected physics. good luck." />
 

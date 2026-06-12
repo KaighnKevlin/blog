@@ -775,13 +775,27 @@ const {
     }
 
     // score: growth-ticks captured by us minus theirs, plus the balance of
-    // ships burned on neutrals. House mode scores *realized* production —
-    // a planet sitting at cap is worth nothing per tick, so the eval
-    // natively prefers futures where our garrisons circulate.
+    // ships burned on neutrals. Nominal growth even in house mode: this is
+    // applied to full-attack futures, and realized-growth scoring there
+    // double-counts pessimism (the hypothetical enemy conquers our emptied
+    // planets at maximum production value) — every move evals ~-75 and the
+    // bot freezes solid. The circulation incentive lives in scoreRealized.
     function scoreB(sim: BSim, p: number, fut: BFut): number {
       let s = fut.bal;
       for (let t = 0; t < HZ; t++) {
-        const g = house ? sim.growth[p] * (1 - fut.shp[t] / sim.cap[p]) : sim.growth[p];
+        if (fut.own[t] === 1) s += sim.growth[p];
+        else if (fut.own[t] === 2) s -= sim.growth[p];
+      }
+      return s;
+    }
+
+    // House utilization term, computed on NORMAL futures only (stable
+    // ownership, no hypothetical streams): realized production — a planet
+    // sitting at cap earns nothing, so circulation scores.
+    function scoreRealized(sim: BSim, p: number, fut: BFut): number {
+      let s = 0;
+      for (let t = 0; t < HZ; t++) {
+        const g = sim.growth[p] * (1 - fut.shp[t] / sim.cap[p]);
         if (fut.own[t] === 1) s += g;
         else if (fut.own[t] === 2) s -= g;
       }
@@ -802,6 +816,7 @@ const {
       let total = 0;
       for (let p = 0; p < sim.P; p++) {
         const fut = futs[p];
+        if (house) total += scoreRealized(sim, p, fut);
         if (fut.own[HZ - 1] === 0) {
           // Still neutral at the horizon: tiny tie-break only ("who would
           // win the race"), real value appears when a move captures it.
@@ -948,6 +963,32 @@ const {
     // generate-candidate-steps + score + combine (1-ply, like the original
     // after its opening phase).
     function aiBocsimacko() {
+      // Opening phase (house mode). The original switched algorithms here
+      // too — 4-ply alpha-beta "until the third planet is captured" —
+      // because the 1-ply full-attack eval is unreliable while all force
+      // sits on one or two planets: the everyone-attacks-everything
+      // assumption is maximally distorting, every spend looks like losing
+      // home, and the bot freezes. Probe data: best move ~-50 vs baseline
+      // +0.2 with one planet. We use greedy expansion instead of the
+      // alpha-beta book; the eval machinery takes over from 3 planets.
+      if (house) {
+        const mine = planets.map((_, i) => i).filter((i) => planets[i].owner === 2);
+        if (mine.length < 3) {
+          const { inc1, inc2 } = incoming();
+          const src = mine.reduce((a, b) => (planets[a].troops >= planets[b].troops ? a : b));
+          let pick: { q: number; need: number; score: number } | null = null;
+          for (let q = 0; q < planets.length; q++) {
+            if (planets[q].owner !== 0) continue;
+            const need = planets[q].troops - inc2[q] + inc1[q] + 1;
+            if (need <= 0) continue;
+            if (planets[src].troops * 0.75 < need * 1.1) continue; // keep a home guard
+            const score = planets[q].prod / ((need + 3) * (0.35 + dist(planets[src], planets[q])));
+            if (!pick || score > pick.score) pick = { q, need, score };
+          }
+          if (pick) sendExact(src, pick.q, Math.ceil(pick.need * 1.1));
+          return;
+        }
+      }
       const sim = bsimFromGame();
       const futs = planets.map((_, p) => computeFutureB(sim, p)!);
       // Optimistic surpluses for sourcing: theirs only counts from tick 1.
@@ -982,12 +1023,15 @@ const {
           }
         }
       }
+      // Planner diagnostics for headless tests / the future x-ray mode.
+      const dbg = ((root as any).__pwPlan = { steps: steps.length, scored: 0, best: 0, baseline: 0, sent: false });
       if (!steps.length) return;
 
       const scored = steps
         .map((step) => ({ step, score: validMove(sim, step) ? evalB(applyOrders(sim, step)) : -Infinity }))
         .filter((s) => s.score > -Infinity)
         .sort((a, b) => b.score - a.score);
+      dbg.scored = scored.length;
       if (!scored.length) return;
 
       // Greedily merge compatible steps into composite moves, best-first.
@@ -1008,7 +1052,10 @@ const {
       // exactly like the original resubmitting each turn.
       const baseline = evalB(sim);
       const best = moves[0];
+      dbg.best = best.score;
+      dbg.baseline = baseline;
       if (best.score <= baseline + 1e-9) return; // doing nothing is a move too
+      dbg.sent = true;
       for (const o of best.step) {
         if (o.t === 0 && planets[o.src].owner === 2) sendExact(o.src, o.dst, o.n);
       }
@@ -1342,6 +1389,7 @@ const {
 
     // Debug/test handle (used by headless playtests and the future arena).
     (root as any).__pw = {
+      hz: HZ,
       get planets() { return planets; },
       get fleets() { return fleets; },
       get routes() { return routes; },
