@@ -7,6 +7,7 @@
  */
 
 :root {
+	color-scheme: light;
 	--accent: #2337ff;
 	--accent-dark: #000d8a;
 	--black: 15, 18, 25;
@@ -40,7 +41,9 @@ body {
 	margin: 0;
 	padding: 0;
 	text-align: left;
-	background: linear-gradient(var(--gray-gradient)) no-repeat;
+	/* The gradient only covers the top 600px; the solid colour underneath it
+	   keeps the rest of the page from falling through to the browser canvas. */
+	background: linear-gradient(var(--gray-gradient)) no-repeat #fff;
 	background-size: 100% 600px;
 	overflow-wrap: break-word;
 	color: rgb(var(--gray-dark));

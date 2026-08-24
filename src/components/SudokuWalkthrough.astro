@@ -1,0 +1,773 @@
+---
+// Visual walkthrough of a full Sudoku solve. The puzzle is solved at build time
+// by src/lib/sudoku.ts, which records every deduction along with the cells that
+// justify it; the client just replays that log and animates it.
+import { solve, stallReport, initialCandidates, EVEREST } from '../lib/sudoku';
+import { DEMOS } from '../lib/sudokuDemos';
+
+interface Props {
+  puzzle?: string;
+  title?: string;
+  subtitle?: string;
+}
+const {
+  puzzle = EVEREST,
+  title = 'AI Everest',
+  subtitle = 'Arto Inkala, 2012 · 21 clues',
+} = Astro.props;
+
+const { steps } = solve(puzzle);
+const stall = stallReport(puzzle);
+const cands = initialCandidates(puzzle);
+const givens = [...puzzle].map((c) => (c >= '1' && c <= '9' ? +c : 0));
+
+const firstPlacement = steps.findIndex((s) => s.placements.length > 0);
+const payload = JSON.stringify({ steps, givens, cands, firstPlacement, demos: DEMOS });
+
+// Box seams for a 9x9, shared by the main board and the demo miniature.
+const seamsFor = (i: number) => {
+  const r = Math.floor(i / 9), c = i % 9;
+  return [
+    c % 3 === 2 && c !== 8 ? 'bx' : '',
+    r % 3 === 2 && r !== 8 ? 'by' : '',
+    c === 8 ? 'edge-r' : '',
+    r === 8 ? 'edge-b' : '',
+  ].filter(Boolean).join(' ');
+};
+---
+
+<div class="sud" data-sud>
+  <header class="sud-head">
+    <div>
+      <h3>{title}</h3>
+      <p class="sud-sub">{subtitle}</p>
+    </div>
+    <div class="sud-count">
+      <span data-sud="counter">0</span><span class="sud-dim">/{steps.length}</span>
+    </div>
+  </header>
+
+  <div class="sud-stall">
+    <p class="sud-stall-lead">
+      Every standard technique, run against the opening position:
+    </p>
+    <ul class="sud-chips">
+      {stall.map((t) => (
+        <li>
+          <button
+            type="button"
+            class={t.fires ? 'hit' : 'miss'}
+            data-demo={t.name}
+            aria-expanded="false"
+          >
+            <span class="mark">{t.fires ? '✓' : '✗'}</span>{t.name}
+          </button>
+        </li>
+      ))}
+    </ul>
+
+    <div class="sud-demo" data-sud="demo" hidden>
+      <div class="sud-demo-grid">
+        {Array.from({ length: 81 }, (_, i) => (
+          <div class={`sud-dcell ${seamsFor(i)}`} data-i={i} data-seams={seamsFor(i)}>
+            <span class="dv"></span>
+            <span class="dm"></span>
+          </div>
+        ))}
+      </div>
+      <div class="sud-demo-side">
+        <h4 data-sud="demoname"></h4>
+        <p data-sud="democap"></p>
+        <p class="sud-demo-note">
+          Illustration only — just the cells that matter.
+        </p>
+      </div>
+    </div>
+
+    <p class="sud-stall-foot">
+      Nothing. Not one digit, not one eliminated candidate. This is where most
+      people put the pencil down. <span class="sud-hint">Tap any technique to
+      see what it looks for.</span>
+    </p>
+  </div>
+
+  <div class="sud-body">
+    <div class="sud-board-wrap">
+      <div class="sud-grid" data-sud="grid">
+        {Array.from({ length: 81 }, (_, i) => (
+          <div class={`sud-cell ${seamsFor(i)}`} data-i={i} data-seams={seamsFor(i)}>
+            <span class="sud-val"></span>
+            <div class="sud-marks">
+              {Array.from({ length: 9 }, (_, d) => <span data-d={d + 1}></span>)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <aside class="sud-panel">
+      <div class="sud-badge" data-sud="badge">Ready</div>
+      <p class="sud-text" data-sud="text">
+        The grid below is the hardest Sudoku ever constructed. Press play and
+        watch it come apart.
+      </p>
+      <div class="sud-legend">
+        <span><i class="k-because"></i>evidence</span>
+        <span><i class="k-focus"></i>target</span>
+        <span><i class="k-chain"></i>hypothesis</span>
+        <span><i class="k-elim"></i>eliminated</span>
+      </div>
+    </aside>
+  </div>
+
+  <div class="sud-progress"><div data-sud="bar"></div></div>
+
+  <div class="sud-controls">
+    <button data-sud="reset" title="Back to the start">⏮</button>
+    <button data-sud="prev" title="Previous step">‹</button>
+    <button class="sud-play" data-sud="play">▶ Play</button>
+    <button data-sud="next" title="Next step">›</button>
+    <button data-sud="jump" class="sud-jump">Skip to the first digit</button>
+    <label class="sud-speed">
+      <input type="range" min="1" max="5" value="3" data-sud="speed" />
+    </label>
+  </div>
+
+  <script type="application/json" data-sud="data" set:html={payload} is:inline />
+</div>
+
+<script>
+  type Move = { i: number; d: number };
+  type Step = {
+    technique: string;
+    tier: number;
+    text: string;
+    focus: number[];
+    because: number[];
+    placements: Move[];
+    eliminations: Move[];
+    chain?: Move[];
+  };
+  type DemoCell = { v?: number; marks?: string; strike?: string; role?: 'unit' | 'pattern' };
+  type Demo = { name: string; caption: string; cells: Record<number, DemoCell> };
+
+  const rowOf = (i: number) => (i / 9) | 0;
+  const colOf = (i: number) => i % 9;
+  const boxOf = (i: number) => ((rowOf(i) / 3) | 0) * 3 + ((colOf(i) / 3) | 0);
+
+  const PEERS: number[][] = [];
+  for (let i = 0; i < 81; i++) {
+    const s = new Set<number>();
+    for (let j = 0; j < 81; j++) {
+      if (j === i) continue;
+      if (rowOf(j) === rowOf(i) || colOf(j) === colOf(i) || boxOf(j) === boxOf(i)) s.add(j);
+    }
+    PEERS.push([...s]);
+  }
+
+  // Delay per step, indexed by the speed slider.
+  const SPEEDS = [1400, 900, 550, 300, 120];
+
+  document.querySelectorAll<HTMLElement>('.sud').forEach((root) => {
+    const dataEl = root.querySelector<HTMLElement>('[data-sud="data"]');
+    if (!dataEl?.textContent) return;
+
+    const { steps, givens, cands, firstPlacement, demos } = JSON.parse(dataEl.textContent) as {
+      steps: Step[];
+      givens: number[];
+      cands: number[];
+      firstPlacement: number;
+      demos: Demo[];
+    };
+
+    const grid = root.querySelector<HTMLElement>('[data-sud="grid"]')!;
+    const badge = root.querySelector<HTMLElement>('[data-sud="badge"]')!;
+    const text = root.querySelector<HTMLElement>('[data-sud="text"]')!;
+    const counter = root.querySelector<HTMLElement>('[data-sud="counter"]')!;
+    const bar = root.querySelector<HTMLElement>('[data-sud="bar"]')!;
+    const speed = root.querySelector<HTMLInputElement>('[data-sud="speed"]')!;
+    const playBtn = root.querySelector<HTMLElement>('[data-sud="play"]')!;
+
+    const cells = Array.from(grid.querySelectorAll<HTMLElement>('.sud-cell'));
+    const vals = cells.map((c) => c.querySelector<HTMLElement>('.sud-val')!);
+    const marks = cells.map((c) => Array.from(c.querySelectorAll<HTMLElement>('.sud-marks span')));
+
+    let k = 0;
+    let timer: number | null = null;
+
+    // Which step placed each cell, so a digit can pop once when it lands and
+    // then cool from blue to ink as the solve moves past it.
+    const placedAt = new Map<number, number>();
+    steps.forEach((s, n) => s.placements.forEach((p) => placedAt.set(p.i, n)));
+
+    const FRESH = [0x23, 0x37, 0xff];
+    const SETTLED = [0x0f, 0x12, 0x19];
+    const COOL_OVER = 10;
+    function ageColor(age: number) {
+      const t = Math.min(age / COOL_OVER, 1);
+      const [r, g, b] = FRESH.map((c, j) => Math.round(c + (SETTLED[j] - c) * t));
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    // Replay the log from the start to get the state just before step k.
+    function stateAt(n: number) {
+      const g = givens.slice();
+      const c = cands.slice();
+      const put = (i: number, d: number) => {
+        g[i] = d;
+        c[i] = 0;
+        for (const p of PEERS[i]) c[p] &= ~(1 << (d - 1));
+      };
+      for (let s = 0; s < n; s++) {
+        for (const p of steps[s].placements) put(p.i, p.d);
+        for (const e of steps[s].eliminations) c[e.i] &= ~(1 << (e.d - 1));
+      }
+      return { g, c };
+    }
+
+    function render() {
+      const { g, c } = stateAt(k);
+      const step: Step | undefined = steps[k];
+
+      const because = new Set(step?.because ?? []);
+      const focus = new Set(step?.focus ?? []);
+      const chain = step?.chain ?? [];
+      const chainAt = new Map<number, number>();
+      chain.forEach((m, idx) => { if (!chainAt.has(m.i)) chainAt.set(m.i, idx); });
+      const willPlace = new Map<number, number>();
+      step?.placements.forEach((p) => willPlace.set(p.i, p.d));
+      const elimKey = new Set((step?.eliminations ?? []).map((e) => `${e.i}:${e.d}`));
+
+      // Every write below is guarded by a comparison. A settled digit whose
+      // state has not changed is never touched, so it cannot re-run its pop
+      // animation or its colour transition just because the step advanced.
+      const restart: HTMLElement[] = [];
+
+      for (let i = 0; i < 81; i++) {
+        const cell = cells[i];
+        const v = vals[i];
+        const chainIdx = chainAt.get(i);
+        const pending = willPlace.get(i);
+
+        let state = '';
+        let digit = '';
+        let colour = '';
+        let delay = '';
+
+        if (g[i]) {
+          digit = String(g[i]);
+          state = 'is-filled';
+          if (!givens[i]) {
+            // Age 0 means this digit landed on the step just applied.
+            const age = k - 1 - (placedAt.get(i) ?? 0);
+            if (age === 0) state += ' is-new';
+            colour = ageColor(age);
+          }
+        } else if (pending) {
+          digit = String(pending);
+          state = 'is-pending';
+        } else if (chainIdx !== undefined) {
+          digit = String(chain[chainIdx].d);
+          state = chainIdx === 0 ? 'is-hypothesis' : 'is-forced';
+          delay = `${Math.min(chainIdx, 40) * 45}ms`;
+        }
+
+        if (givens[i]) state += ' is-given';
+        if (because.has(i) && chainIdx === undefined) state += ' is-because';
+        if (focus.has(i)) state += ' is-focus';
+
+        const want = `sud-cell ${cell.dataset.seams ?? ''} ${state}`.replace(/\s+/g, ' ').trim();
+        if (cell.className !== want) cell.className = want;
+        if (v.textContent !== digit) v.textContent = digit;
+        if (v.style.color !== colour) v.style.color = colour;
+        if (v.style.animationDelay !== delay) v.style.animationDelay = delay;
+
+        // The chain cascade should replay on every step even when a cell keeps
+        // the same class, so it gets an explicit, targeted restart.
+        if (chainIdx !== undefined) restart.push(v);
+
+        // Pencil marks.
+        const showMarks = !g[i] && pending === undefined && chainIdx === undefined;
+        for (let d = 1; d <= 9; d++) {
+          const m = marks[i][d - 1];
+          const on = showMarks && c[i] & (1 << (d - 1));
+          const txt = on ? String(d) : '';
+          const cls = on && elimKey.has(`${i}:${d}`) ? 'is-elim' : '';
+          if (m.textContent !== txt) m.textContent = txt;
+          if (m.className !== cls) m.className = cls;
+        }
+      }
+
+      for (const v of restart) {
+        v.style.animation = 'none';
+        void v.offsetWidth;
+        v.style.animation = '';
+      }
+
+      if (step) {
+        badge.textContent = step.technique;
+        badge.dataset.tier = String(step.tier);
+        text.textContent = step.text;
+      } else {
+        badge.textContent = 'Solved';
+        badge.dataset.tier = '0';
+        text.textContent =
+          'Sixty cells, none of them guessed. Every digit above is the end of a proof.';
+      }
+      counter.textContent = String(k);
+      bar.style.width = `${(k / steps.length) * 100}%`;
+    }
+
+    function go(n: number) {
+      k = Math.max(0, Math.min(steps.length, n));
+      if (k === steps.length) stop();
+      render();
+    }
+    function stop() {
+      if (timer !== null) { clearInterval(timer); timer = null; }
+      playBtn.textContent = '▶ Play';
+    }
+    function play() {
+      if (timer !== null) return stop();
+      if (k >= steps.length) k = 0;
+      playBtn.textContent = '❚❚ Pause';
+      timer = window.setInterval(() => go(k + 1), SPEEDS[+speed.value - 1]);
+    }
+
+    // ---- technique chips: hover to peek, click to pin ----------------------
+    const demoBox = root.querySelector<HTMLElement>('[data-sud="demo"]')!;
+    const demoName = root.querySelector<HTMLElement>('[data-sud="demoname"]')!;
+    const demoCap = root.querySelector<HTMLElement>('[data-sud="democap"]')!;
+    const demoCells = Array.from(demoBox.querySelectorAll<HTMLElement>('.sud-dcell'));
+    const chips = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-demo]'));
+    const demoBy = new Map(demos.map((d) => [d.name, d]));
+    let pinned: string | null = null;
+
+    function paintDemo(name: string | null) {
+      if (!name || !demoBy.has(name)) { demoBox.hidden = true; return; }
+      const demo = demoBy.get(name)!;
+      demoBox.hidden = false;
+      demoName.textContent = demo.name;
+      demoCap.textContent = demo.caption;
+
+      for (let i = 0; i < 81; i++) {
+        const cell = demoCells[i];
+        const spec = demo.cells[i];
+        cell.className = `sud-dcell ${cell.dataset.seams ?? ''}`;
+        const dv = cell.querySelector<HTMLElement>('.dv')!;
+        const dm = cell.querySelector<HTMLElement>('.dm')!;
+        dv.textContent = '';
+        dm.textContent = '';
+        dm.replaceChildren();
+        if (!spec) continue;
+
+        if (spec.role) cell.classList.add(spec.role === 'unit' ? 'is-because' : 'is-focus');
+        if (spec.strike) cell.classList.add('has-elim');
+        if (spec.v) {
+          dv.textContent = String(spec.v);
+          cell.classList.add('has-val');
+        } else if (spec.marks) {
+          const dead = new Set((spec.strike ?? '').split(''));
+          for (const ch of spec.marks) {
+            const s = document.createElement('span');
+            s.textContent = ch;
+            if (dead.has(ch)) s.className = 'is-elim';
+            dm.appendChild(s);
+          }
+        }
+      }
+    }
+
+    chips.forEach((chip) => {
+      const name = chip.dataset.demo!;
+      chip.addEventListener('mouseenter', () => { if (!pinned) paintDemo(name); });
+      chip.addEventListener('focus', () => { if (!pinned) paintDemo(name); });
+      chip.addEventListener('click', () => {
+        pinned = pinned === name ? null : name;
+        chips.forEach((c) => {
+          const on = c.dataset.demo === pinned;
+          c.classList.toggle('is-pinned', on);
+          c.setAttribute('aria-expanded', String(on));
+        });
+        paintDemo(pinned);
+      });
+    });
+    root.querySelector('.sud-chips')!.addEventListener('mouseleave', () => paintDemo(pinned));
+
+    root.querySelector('[data-sud="next"]')!.addEventListener('click', () => { stop(); go(k + 1); });
+    root.querySelector('[data-sud="prev"]')!.addEventListener('click', () => { stop(); go(k - 1); });
+    root.querySelector('[data-sud="reset"]')!.addEventListener('click', () => { stop(); go(0); });
+    root.querySelector('[data-sud="jump"]')!.addEventListener('click', () => { stop(); go(firstPlacement); });
+    playBtn.addEventListener('click', play);
+    speed.addEventListener('input', () => { if (timer !== null) { stop(); play(); } });
+
+    render();
+  });
+</script>
+
+<style>
+  .sud {
+    width: min(96vw, 900px);
+    margin: 2.5em 0 3em 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    border: 1px solid #e6e8ee;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 2px rgba(15, 18, 25, 0.04), 0 12px 32px rgba(15, 18, 25, 0.06);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .sud-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.1rem;
+  }
+  .sud-head h3 { margin: 0; font-size: 1.35rem; letter-spacing: -0.01em; }
+  .sud-sub {
+    margin: 0.15rem 0 0;
+    font-size: 0.8rem;
+    color: #8b93a7;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .sud-count {
+    font-variant-numeric: tabular-nums;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #2337ff;
+    white-space: nowrap;
+  }
+  .sud-dim { color: #b9bfcf; font-weight: 500; }
+
+  .sud-stall {
+    background: #fbfbfd;
+    border: 1px solid #edeef3;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 1.25rem;
+  }
+  .sud-stall-lead, .sud-stall-foot {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #6b7280;
+  }
+  .sud-stall-foot { margin-top: 0.7rem; color: #9aa1b1; font-style: italic; }
+  .sud-chips {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.65rem 0 0;
+    padding: 0;
+  }
+  .sud-chips li { display: inline-flex; }
+  .sud-chips button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font: inherit;
+    font-size: 0.72rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid #e6e8ee;
+    color: #9aa1b1;
+    background: #fff;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease;
+  }
+  .sud-chips button:hover,
+  .sud-chips button:focus-visible {
+    border-color: #b9c0d4;
+    color: #4b5468;
+  }
+  .sud-chips button.is-pinned {
+    border-color: #2337ff;
+    color: #2337ff;
+    background: #eef2ff;
+  }
+  .sud-chips .mark { font-weight: 700; color: #d1495b; }
+  .sud-chips button.hit { color: #1f7a4d; border-color: #bfe3d0; }
+  .sud-chips button.hit .mark { color: #1f7a4d; }
+  .sud-hint { color: #b9bfcf; font-style: normal; }
+
+  .sud-demo {
+    display: flex;
+    gap: 1.1rem;
+    align-items: flex-start;
+    margin-top: 0.9rem;
+    padding: 0.9rem;
+    background: #fff;
+    border: 1px solid #e6e8ee;
+    border-radius: 10px;
+  }
+  .sud-demo-grid {
+    display: grid;
+    grid-template-columns: repeat(9, max-content);
+    border: 2px solid #0f1219;
+    border-radius: 5px;
+    overflow: hidden;
+    flex: 0 0 auto;
+  }
+  .sud-dcell {
+    box-sizing: border-box;
+    position: relative;
+    width: 25px;
+    height: 25px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid #e8eaf0;
+    border-bottom: 1px solid #e8eaf0;
+  }
+  .sud-dcell.bx { border-right: 2px solid #0f1219; }
+  .sud-dcell.by { border-bottom: 2px solid #0f1219; }
+  .sud-dcell.edge-r { border-right: none; }
+  .sud-dcell.edge-b { border-bottom: none; }
+  .sud-dcell.is-because { background: #eef2ff; }
+  .sud-dcell.is-focus { background: #fff7ed; box-shadow: inset 0 0 0 2px #f59e0b; z-index: 1; }
+  .sud-dcell.has-elim { background: #fef2f2; }
+  .sud-dcell .dv { font-size: 14px; font-weight: 700; color: #0f1219; line-height: 1; }
+  .sud-dcell .dm {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0 1px;
+    padding: 0 1px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 8px;
+    line-height: 1.05;
+    color: #7b8398;
+  }
+  .sud-dcell .dm .is-elim { color: #dc2626; font-weight: 700; text-decoration: line-through; }
+  .sud-demo-side { flex: 1 1 0; min-width: 0; }
+  .sud-demo-side h4 {
+    margin: 0 0 0.35rem;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+  }
+  .sud-demo-side p { margin: 0; font-size: 0.82rem; color: #4b5468; }
+  .sud-demo-note { margin-top: 0.5rem !important; font-size: 0.7rem !important; color: #b0b6c6 !important; }
+
+  .sud-body {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+  }
+  .sud-board-wrap { flex: 0 0 auto; }
+
+  .sud-grid {
+    display: grid;
+    grid-template-columns: repeat(9, max-content);
+    background: #fff;
+    border: 2px solid #0f1219;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .sud-cell {
+    --size: clamp(30px, 5.4vw, 46px);
+    box-sizing: border-box;
+    position: relative;
+    width: var(--size);
+    height: var(--size);
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid #dfe2ea;
+    border-bottom: 1px solid #dfe2ea;
+    transition: background-color 180ms ease, box-shadow 180ms ease;
+  }
+  /* Thicker seams between the 3x3 boxes. */
+  .sud-cell.bx { border-right: 2px solid #0f1219; }
+  .sud-cell.by { border-bottom: 2px solid #0f1219; }
+  .sud-cell.edge-r { border-right: none; }
+  .sud-cell.edge-b { border-bottom: none; }
+
+  .sud-val {
+    font-size: calc(var(--size) * 0.56);
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: #c8ccd8;
+  }
+  .is-given .sud-val { color: #0f1219; }
+  /* Colour is set inline so it can cool from blue to ink with age; only the
+     digit that just landed is allowed to pop. */
+  .is-filled:not(.is-given) .sud-val { transition: color 400ms ease; }
+  .is-filled.is-new:not(.is-given) .sud-val {
+    animation: sud-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .is-pending .sud-val {
+    color: #1f9d55;
+    animation: sud-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .is-hypothesis .sud-val,
+  .is-forced .sud-val {
+    font-weight: 600;
+    animation: sud-fade 260ms ease both;
+  }
+  .is-hypothesis .sud-val { color: #7c3aed; }
+  .is-forced .sud-val { color: #a78bfa; font-size: calc(var(--size) * 0.46); }
+
+  .is-because { background: #eef2ff; }
+  .is-hypothesis { background: #f3ecff; }
+  .is-forced { background: #faf7ff; }
+  .is-pending { background: #eafaf0; }
+  .is-focus {
+    background: #fff7ed;
+    box-shadow: inset 0 0 0 2px #f59e0b;
+    z-index: 1;
+  }
+  .is-hypothesis.is-focus { background: #f3ecff; }
+
+  .sud-marks {
+    position: absolute;
+    inset: 2px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    pointer-events: none;
+  }
+  .sud-marks span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: calc(var(--size) * 0.235);
+    line-height: 1;
+    color: #b0b6c6;
+  }
+  .sud-marks span.is-elim {
+    color: #dc2626;
+    font-weight: 700;
+    text-decoration: line-through;
+    animation: sud-blink 700ms ease-in-out infinite;
+  }
+
+  .sud-panel {
+    flex: 1 1 0;
+    min-width: 0;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+  }
+  .sud-badge {
+    display: inline-block;
+    align-self: flex-start;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #2337ff;
+    margin-bottom: 0.7rem;
+  }
+  .sud-badge[data-tier='2'] { background: #eafaf0; color: #1f7a4d; }
+  .sud-badge[data-tier='3'] { background: #fff7ed; color: #b45309; }
+  .sud-badge[data-tier='4'] { background: #f3ecff; color: #7c3aed; }
+  .sud-badge[data-tier='0'] { background: #0f1219; color: #fff; }
+  .sud-text {
+    margin: 0;
+    font-size: 0.94rem;
+    color: #3d4455;
+    min-height: 7.5em;
+  }
+  .sud-legend {
+    margin-top: auto;
+    padding-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.9rem;
+    font-size: 0.7rem;
+    color: #9aa1b1;
+  }
+  .sud-legend span { display: inline-flex; align-items: center; gap: 0.32rem; }
+  .sud-legend i {
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    border: 1px solid #e2e5ee;
+  }
+  .k-because { background: #eef2ff; }
+  .k-focus { background: #fff7ed; border-color: #f59e0b !important; }
+  .k-chain { background: #f3ecff; }
+  .k-elim { background: #fee2e2; }
+
+  .sud-progress {
+    height: 3px;
+    background: #edeef3;
+    border-radius: 999px;
+    margin: 1.35rem 0 1rem;
+    overflow: hidden;
+  }
+  .sud-progress div {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #7c3aed, #2337ff);
+    transition: width 200ms ease;
+  }
+
+  .sud-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+  .sud-controls button {
+    font: inherit;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #e2e5ee;
+    background: #fff;
+    color: #3d4455;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease;
+  }
+  .sud-controls button:hover { background: #f6f7fb; border-color: #cfd4e2; }
+  .sud-controls .sud-play {
+    background: #0f1219;
+    border-color: #0f1219;
+    color: #fff;
+    min-width: 92px;
+    font-weight: 600;
+  }
+  .sud-controls .sud-play:hover { background: #2337ff; border-color: #2337ff; }
+  .sud-jump { margin-left: 0.15rem; }
+  .sud-speed { margin-left: auto; display: flex; align-items: center; }
+  .sud-speed input { width: 92px; accent-color: #2337ff; }
+
+  @keyframes sud-pop {
+    0% { transform: scale(0.4); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes sud-fade {
+    0% { opacity: 0; transform: translateY(-2px); }
+    100% { opacity: 1; transform: none; }
+  }
+  @keyframes sud-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+  }
+
+  @media (max-width: 700px) {
+    .sud { padding: 1.1rem; border-radius: 12px; }
+    .sud-body { flex-direction: column; align-items: center; }
+    .sud-panel { width: 100%; }
+    .sud-demo { flex-direction: column; align-items: center; }
+    .sud-demo-side { width: 100%; }
+    .sud-text { min-height: 5.5em; }
+    .sud-speed { margin-left: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sud-val, .sud-marks span.is-elim { animation: none !important; }
+  }
+</style>
