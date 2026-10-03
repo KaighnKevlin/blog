@@ -1,8 +1,16 @@
 ---
 import BaseHead from '../components/BaseHead.astro';
-import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
 import { SITE_TITLE } from '../consts';
+
+const facts = [
+	['Day job', 'Software engineer at Google'],
+	['Lives', 'West Village, NYC'],
+	['From', 'North Carolina'],
+	['School', 'Duke, Math & CS'],
+	['Off the clock', 'Fostering cats, friends, skiing'],
+];
 ---
 
 <!doctype html>
@@ -12,55 +20,202 @@ import { SITE_TITLE } from '../consts';
 	</head>
 	<body>
 		<Header />
-		<main>
-			<h1>About Me</h1>
-			<p>
-				Hi, I'm Kaighn Kevlin. I'm a Software Engineer at Google living in the West Village.
-				I grew up in North Carolina and went to Duke for Math and CS.
-			</p>
-			<p>
-				Ever since 8th grade, I wanted to be an economist. I have always been fascinated by
-				exploring the inner workings of society, and I tend to see the world in terms of
-				incentives, game theory, and utility maximization. Because of that, you might be tempted
-				to write me off as a standard tech-bro rationalist&mdash;but the truth is, I'm a big feeler.
-			</p>
-			<p>
-				My rationalism was a defense mechanism. When you grow up with an alcoholic mother and a
-				sister with bipolar disorder who believes she can talk to God, you need a way to make
-				sense of the chaos. I lost my parents in high school and college, and my sister later on.
-				Through all of that, school was my safe space. It was a refuge that offered structured
-				feedback, infinite potential for learning, and a community of teachers and classmates I
-				genuinely loved.
-			</p>
-			<p>
-				I still love learning, which is why this blog exists. This is a place for me to explore
-				ideas, share what I've learned, and invite feedback and criticism. There is something
-				uniquely motivating about working in the public square. I want to write about
-				everything&mdash;from my frustrations with math education to the hard, vulnerable parts of my
-				life. When I was navigating my own grief, I remember how incredibly lonely it felt. I
-				wished people opened up more so we could learn from each other and find comfort in shared
-				experiences. I hope this site can be a small piece of that.
-			</p>
-			<p>
-				I am also deeply motivated by a frustration with gatekept knowledge. In college, I took a
-				class called Existentialist Cinema. Half the time, it was a profound experience; the other
-				half, the professor (who I suspect did a lot of drugs back in the day) just chained word
-				associations and told random stories about actors. But it opened my eyes to films like
-				<em>Rashomon</em>, <em>Breathless</em>, and <em>Vertigo</em>. I realized how much depth
-				I would have missed&mdash;and how I probably never would have watched them in the first
-				place&mdash;without that guided analysis. When I graduated, I was struck by how high-level
-				movie analysis is locked away in paid academic journals. Movies are supposed to be an
-				accessible art form, yet truly understanding what the hell <em>Blow-Up</em> was about is
-				hidden behind a paywall. That irks me to no end.
-			</p>
-			<p>
-				More than anything, I love education and connection. When I'm not writing or coding, you
-				can find me in NYC, fostering cats, and hanging out with friends.
-			</p>
+		<main class="about">
+			<header class="intro">
+				<p class="kicker">About</p>
+				<h1>Hi, I'm Kaighn.</h1>
+			</header>
 
-			<hr />
-			<p><em>Disclaimer: All views, opinions, and projects shared on this site are my own and do not reflect the views or opinions of my employer.</em></p>
+			<div class="layout">
+				<aside class="card">
+					<div class="monogram" aria-hidden="true">K<span>.</span></div>
+					<dl>
+						{
+							facts.map(([k, v]) => (
+								<div>
+									<dt>{k}</dt>
+									<dd>{v}</dd>
+								</div>
+							))
+						}
+					</dl>
+					<div class="links">
+						<a href="https://github.com/KaighnKevlin" target="_blank" rel="noopener">GitHub ↗</a>
+						<a href="/rss.xml">RSS</a>
+					</div>
+				</aside>
+
+				<div class="prose">
+					<p class="first">
+						I'm a Software Engineer at Google living in the West Village. I grew up in North Carolina
+						and went to Duke for Math and CS.
+					</p>
+					<p>
+						Ever since 8th grade, I wanted to be an economist. I have always been fascinated by
+						exploring the inner workings of society, and I tend to see the world in terms of
+						incentives, game theory, and utility maximization. Because of that, you might be tempted
+						to write me off as a standard tech-bro rationalist&mdash;but the truth is, I'm a big
+						feeler.
+					</p>
+					<p>
+						My rationalism was a defense mechanism. When you grow up with an alcoholic mother and a
+						sister with bipolar disorder who believes she can talk to God, you need a way to make
+						sense of the chaos. I lost my parents in high school and college, and my sister later on.
+						Through all of that, school was my safe space. It was a refuge that offered structured
+						feedback, infinite potential for learning, and a community of teachers and classmates I
+						genuinely loved.
+					</p>
+					<p>
+						I still love learning, which is why this blog exists. This is a place for me to explore
+						ideas, share what I've learned, and invite feedback and criticism. There is something
+						uniquely motivating about working in the public square. I want to write about
+						everything&mdash;from my frustrations with math education to the hard, vulnerable parts
+						of my life. When I was navigating my own grief, I remember how incredibly lonely it felt.
+						I wished people opened up more so we could learn from each other and find comfort in
+						shared experiences. I hope this site can be a small piece of that.
+					</p>
+					<p>
+						I am also deeply motivated by a frustration with gatekept knowledge. In college, I took a
+						class called Existentialist Cinema. Half the time, it was a profound experience; the
+						other half, the professor (who I suspect did a lot of drugs back in the day) just chained
+						word associations and told random stories about actors. But it opened my eyes to films
+						like <em>Rashomon</em>, <em>Breathless</em>, and <em>Vertigo</em>. I realized how much
+						depth I would have missed&mdash;and how I probably never would have watched them in the
+						first place&mdash;without that guided analysis. When I graduated, I was struck by how
+						high-level movie analysis is locked away in paid academic journals. Movies are supposed
+						to be an accessible art form, yet truly understanding what the hell <em>Blow-Up</em> was
+						about is hidden behind a paywall. That irks me to no end.
+					</p>
+					<p>
+						More than anything, I love education and connection. When I'm not writing or coding, you
+						can find me in NYC, fostering cats, and hanging out with friends.
+					</p>
+					<p class="disclaimer">
+						All views, opinions, and projects shared on this site are my own and do not reflect the
+						views or opinions of my employer.
+					</p>
+				</div>
+			</div>
 		</main>
 		<Footer />
 	</body>
 </html>
+
+<style>
+	main.about {
+		width: 1040px;
+		max-width: 100%;
+		padding: 3.5rem 1.25rem 1rem;
+	}
+	.intro .kicker {
+		margin: 0 0 0.6rem;
+	}
+	.intro h1 {
+		margin: 0 0 2.5rem;
+		font-size: clamp(2.6rem, 5vw + 1rem, 4.4rem);
+		letter-spacing: -0.04em;
+	}
+	.layout {
+		display: grid;
+		grid-template-columns: 280px 1fr;
+		gap: 4rem;
+		align-items: start;
+	}
+	.card {
+		position: sticky;
+		top: 88px;
+		padding: 1.5rem;
+		border-radius: 20px;
+		background: var(--card);
+		border: 1px solid var(--rule);
+		box-shadow: var(--shadow-sm);
+	}
+	.monogram {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		aspect-ratio: 1.4;
+		margin-bottom: 1.25rem;
+		border-radius: 14px;
+		background: var(--ink);
+		color: var(--paper);
+		font-family: var(--font-display);
+		font-size: 5.5rem;
+		font-weight: 700;
+		font-variation-settings: 'SOFT' 100, 'WONK' 1;
+		letter-spacing: -0.04em;
+		line-height: 1;
+	}
+	.monogram span {
+		color: var(--brand);
+	}
+	dl {
+		margin: 0;
+	}
+	dl div {
+		padding: 0.6rem 0;
+		border-bottom: 1px dashed var(--rule);
+	}
+	dt {
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+	dd {
+		margin: 0.1rem 0 0;
+		font-size: 0.95rem;
+		font-weight: 550;
+		color: var(--ink);
+	}
+	.links {
+		display: flex;
+		gap: 1rem;
+		margin-top: 1rem;
+		font-size: 0.9rem;
+		font-weight: 600;
+	}
+	.links a {
+		text-decoration: none;
+	}
+	.prose {
+		max-width: 640px;
+	}
+	.prose .first {
+		font-size: 1.4em;
+		line-height: 1.45;
+		color: var(--ink);
+	}
+	.disclaimer {
+		margin-top: 2.5rem;
+		padding-top: 1.25rem;
+		border-top: 1px solid var(--rule);
+		font-family: var(--font-sans) !important;
+		font-size: 0.85rem !important;
+		font-style: italic;
+		color: var(--muted);
+	}
+	@media (max-width: 860px) {
+		.layout {
+			grid-template-columns: 1fr;
+			gap: 2rem;
+		}
+		.card {
+			position: static;
+			display: grid;
+			grid-template-columns: 120px 1fr;
+			gap: 0 1.25rem;
+			align-items: start;
+		}
+		.monogram {
+			aspect-ratio: 1;
+			font-size: 3.4rem;
+			margin: 0;
+		}
+		.links {
+			grid-column: 1 / -1;
+		}
+	}
+</style>

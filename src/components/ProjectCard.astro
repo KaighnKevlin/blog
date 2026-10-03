@@ -1,0 +1,173 @@
+---
+import PostCover from './PostCover.astro';
+
+interface Props {
+	project: {
+		title: string;
+		description: string;
+		url: string | null;
+		status: string;
+		cover: string;
+		tags: string[];
+	};
+	compact?: boolean;
+}
+const { project, compact = false } = Astro.props;
+const STATUS: Record<string, string> = { live: 'Live', 'write-up': 'Write-up', wip: 'In progress' };
+const Tag = project.url ? 'a' : 'div';
+---
+
+<Tag href={project.url ?? undefined} class:list={['project', { compact, disabled: !project.url }]}>
+	<div class="art"><PostCover slug={project.cover} /></div>
+	<div class="body">
+		<div class="top">
+			<h3>{project.title}</h3>
+			<span class:list={['status', project.status]}>{STATUS[project.status] ?? project.status}</span>
+		</div>
+		<p>{project.description}</p>
+		{
+			!compact && (
+				<div class="tags">
+					{project.tags.map((t) => (
+						<span class="tag">{t}</span>
+					))}
+				</div>
+			)
+		}
+	</div>
+</Tag>
+
+<style>
+	.project {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		overflow: hidden;
+		border-radius: 18px;
+		background: var(--card);
+		border: 1px solid var(--rule);
+		color: inherit;
+		text-decoration: none;
+		transition:
+			transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+			box-shadow 0.25s ease;
+	}
+	a.project:hover {
+		transform: translateY(-3px);
+		box-shadow: var(--shadow-md);
+	}
+	.art :global(svg) {
+		aspect-ratio: 8 / 3.4;
+	}
+	/* compact: small square thumbnail beside the text */
+	.compact {
+		flex-direction: row;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.7rem;
+	}
+	.compact .art {
+		flex-shrink: 0;
+		width: 76px;
+		height: 76px;
+		overflow: hidden;
+		border-radius: 12px;
+	}
+	.compact .art :global(svg) {
+		width: 100%;
+		height: 100%;
+		aspect-ratio: 1;
+	}
+	.compact .body {
+		padding: 0.1rem 0.4rem 0.1rem 0.75rem;
+	}
+	.compact h3 {
+		font-size: 1.08rem;
+	}
+	.compact p {
+		font-size: 0.84rem;
+		margin-top: 0.25rem;
+	}
+	.disabled .art {
+		filter: saturate(0.35);
+		opacity: 0.8;
+	}
+	.body {
+		padding: 1rem 1.15rem 1.2rem;
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+	}
+	.top {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
+	h3 {
+		margin: 0;
+		font-size: 1.2rem;
+	}
+	a.project:hover h3 {
+		color: var(--brand-ink);
+	}
+	p {
+		margin: 0.45rem 0 0;
+		font-size: 0.9rem;
+		line-height: 1.5;
+		color: var(--muted);
+	}
+	.compact p {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+	.status {
+		flex-shrink: 0;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+	.status::before {
+		content: '';
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--rule-strong);
+	}
+	.status.live {
+		color: #2e7a3a;
+	}
+	.status.live::before {
+		background: #3fb950;
+		box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.18);
+	}
+	.status.write-up::before {
+		background: var(--c-cobalt);
+	}
+	.status.wip::before {
+		background: var(--c-marigold);
+	}
+	.tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		margin-top: auto;
+		padding-top: 0.9rem;
+	}
+	.tag {
+		font-size: 0.72rem;
+		font-weight: 550;
+		padding: 0.2rem 0.55rem;
+		border-radius: 6px;
+		background: var(--paper-2);
+		color: var(--ink-2);
+	}
+</style>

@@ -1,0 +1,195 @@
+---
+import { Image } from 'astro:assets';
+import { KIND_LABEL, type Post, postKind, readingMinutes } from '../lib/posts';
+import FormattedDate from './FormattedDate.astro';
+import PostCover from './PostCover.astro';
+
+interface Props {
+	post: Post;
+	variant?: 'card' | 'row' | 'feature';
+}
+const { post, variant = 'card' } = Astro.props;
+const kind = postKind(post);
+const href = `/blog/${post.id}/`;
+---
+
+<a href={href} class:list={['post', variant]} data-kind={kind}>
+	<div class="art">
+		{
+			post.data.heroImage ? (
+				<Image src={post.data.heroImage} width={800} height={500} alt="" />
+			) : (
+				<PostCover slug={post.id} />
+			)
+		}
+	</div>
+	<div class="body">
+		<div class="meta">
+			<span class:list={['pill', kind]}>{KIND_LABEL[kind]}</span>
+			<span class="kicker"><FormattedDate date={post.data.pubDate} /></span>
+			{kind === 'essay' && <span class="kicker">· {readingMinutes(post)} min</span>}
+		</div>
+		<h3 class="title">{post.data.title}</h3>
+		{variant !== 'card' && <p class="desc">{post.data.description}</p>}
+		{variant === 'feature' && <span class="cta">{kind === 'interactive' ? 'Read & play' : 'Read it'} <span aria-hidden="true">→</span></span>}
+	</div>
+</a>
+
+<style>
+	.post {
+		display: block;
+		color: inherit;
+		text-decoration: none;
+	}
+	.art {
+		overflow: hidden;
+		border-radius: var(--radius);
+		background: var(--paper-2);
+		box-shadow: var(--shadow-sm);
+		transition:
+			transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+			box-shadow 0.3s ease;
+	}
+	.art :global(svg),
+	.art :global(img) {
+		display: block;
+		width: 100%;
+		aspect-ratio: 8 / 5;
+		object-fit: cover;
+		border-radius: 0;
+		transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+	}
+	.post:hover .art {
+		transform: translateY(-3px);
+		box-shadow: var(--shadow-md);
+	}
+	.post:hover .art :global(svg),
+	.post:hover .art :global(img) {
+		transform: scale(1.04);
+	}
+	.meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 0.5rem;
+	}
+	.meta .kicker {
+		letter-spacing: 0.04em;
+	}
+	.title {
+		margin: 0;
+		font-size: 1.3rem;
+		line-height: 1.18;
+		transition: color 0.15s ease;
+	}
+	.post:hover .title {
+		color: var(--brand-ink);
+	}
+	.desc {
+		margin: 0.5rem 0 0;
+		color: var(--muted);
+		font-family: var(--font-serif);
+		font-size: 1.02rem;
+		line-height: 1.5;
+	}
+
+	/* card: cover on top */
+	.card .body {
+		padding: 1rem 0.15rem 0;
+	}
+
+	/* row: thumbnail left */
+	.row {
+		display: grid;
+		grid-template-columns: 200px 1fr;
+		gap: 1.5rem;
+		align-items: center;
+		padding: 1.25rem 0;
+		border-bottom: 1px solid var(--rule);
+	}
+	.row .art {
+		border-radius: 10px;
+	}
+	.row .title {
+		font-size: 1.45rem;
+	}
+	.row .desc {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	/* feature: big hero card */
+	.feature {
+		display: grid;
+		grid-template-columns: 1.25fr 1fr;
+		gap: 2.5rem;
+		align-items: center;
+		padding: 1.25rem;
+		border-radius: 24px;
+		background: var(--card);
+		border: 1px solid var(--rule);
+		box-shadow: var(--shadow-sm);
+		transition: box-shadow 0.3s ease;
+	}
+	.feature:hover {
+		box-shadow: var(--shadow-md);
+	}
+	.feature .art {
+		border-radius: 16px;
+		box-shadow: none;
+	}
+	.feature:hover .art {
+		transform: none;
+		box-shadow: none;
+	}
+	.feature .body {
+		padding-right: 1.5rem;
+	}
+	.feature .title {
+		font-size: clamp(1.7rem, 2.4vw + 0.8rem, 2.5rem);
+		letter-spacing: -0.03em;
+	}
+	.feature .desc {
+		font-size: 1.12rem;
+		margin-top: 0.8rem;
+	}
+	.cta {
+		display: inline-flex;
+		gap: 0.4rem;
+		margin-top: 1.25rem;
+		font-weight: 650;
+		font-size: 0.95rem;
+		color: var(--brand-ink);
+	}
+	.cta span {
+		transition: transform 0.2s ease;
+	}
+	.feature:hover .cta span {
+		transform: translateX(4px);
+	}
+
+	@media (max-width: 760px) {
+		.feature {
+			grid-template-columns: 1fr;
+			gap: 1.1rem;
+			padding: 0.75rem 0.75rem 1.25rem;
+		}
+		.feature .body {
+			padding: 0 0.5rem;
+		}
+		.row {
+			grid-template-columns: 112px 1fr;
+			gap: 1rem;
+			align-items: start;
+		}
+		.row .title {
+			font-size: 1.15rem;
+		}
+		.row .desc {
+			font-size: 0.95rem;
+		}
+	}
+</style>

@@ -1,13 +1,61 @@
 @import "tailwindcss";
+@import "@fontsource-variable/fraunces/full.css";
+@import "@fontsource-variable/fraunces/full-italic.css";
+@import "@fontsource-variable/source-serif-4/index.css";
+@import "@fontsource-variable/source-serif-4/wght-italic.css";
+@import "@fontsource-variable/inter/index.css";
+@import "@fontsource-variable/jetbrains-mono/index.css";
 
 /*
-  The CSS in this style tag is based off of Bear Blog's default CSS.
-  https://github.com/HermanMartinus/bearblog/blob/297026a877bc2ab2b3bdfbd6b9f7961c350917dd/templates/styles/blog/default.css
-  License MIT: https://github.com/HermanMartinus/bearblog/blob/master/LICENSE.md
- */
+  Design tokens.
 
+  The site chrome uses the --paper / --ink / --brand family below. The older
+  --accent / --black / --gray* variables are kept with their original values
+  because many post widgets read them directly — changing them would restyle
+  every interactive in the archive.
+*/
 :root {
 	color-scheme: light;
+
+	/* Surfaces & text */
+	--paper: #f7f4ee;
+	--paper-2: #efeae0;
+	--card: #fffdf9;
+	--ink: #1b1a17;
+	--ink-2: #3a3832;
+	--muted: #6f6a60;
+	--rule: #e3ddd1;
+	--rule-strong: #cfc7b7;
+
+	/* Brand */
+	--brand: #e5482f;
+	--brand-ink: #b8321c;
+	--brand-wash: #fbe3dc;
+
+	/* Cover palette */
+	--c-tomato: #e5482f;
+	--c-marigold: #f2b33d;
+	--c-teal: #1f8a7a;
+	--c-cobalt: #2f4bdc;
+	--c-plum: #6b3fa0;
+	--c-sage: #cfe0c3;
+	--c-sky: #c9def2;
+	--c-blush: #f6d6ca;
+	--c-butter: #f7e7bd;
+	--c-night: #15172b;
+
+	/* Type */
+	--font-display: "Fraunces Variable", "Iowan Old Style", Georgia, serif;
+	--font-serif: "Source Serif 4 Variable", "Iowan Old Style", Georgia, serif;
+	--font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+	--font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+	--radius: 14px;
+	--shadow-sm: 0 1px 2px rgba(27, 26, 23, 0.06), 0 2px 6px rgba(27, 26, 23, 0.05);
+	--shadow-md: 0 2px 4px rgba(27, 26, 23, 0.05), 0 10px 28px rgba(27, 26, 23, 0.1);
+	--shadow-lg: 0 4px 8px rgba(27, 26, 23, 0.06), 0 22px 50px rgba(27, 26, 23, 0.16);
+
+	/* Legacy tokens (read by post widgets — keep values stable) */
 	--accent: #2337ff;
 	--accent-dark: #000d8a;
 	--black: 15, 18, 25;
@@ -19,45 +67,50 @@
 		0 2px 6px rgba(var(--gray), 25%), 0 8px 24px rgba(var(--gray), 33%),
 		0 16px 32px rgba(var(--gray), 33%);
 }
+
 ::selection {
-	background: rgba(35, 55, 255, 0.15);
+	background: var(--brand-wash);
+	color: var(--ink);
 }
-@font-face {
-	font-family: "Atkinson";
-	src: url("/fonts/atkinson-regular.woff") format("woff");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+
+html {
+	scroll-padding-top: 5rem;
 }
-@font-face {
-	font-family: "Atkinson";
-	src: url("/fonts/atkinson-bold.woff") format("woff");
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
-}
+
 body {
-	font-family: "Atkinson", sans-serif;
+	font-family: var(--font-sans);
 	margin: 0;
 	padding: 0;
 	text-align: left;
-	/* The gradient only covers the top 600px; the solid colour underneath it
-	   keeps the rest of the page from falling through to the browser canvas. */
-	background: linear-gradient(var(--gray-gradient)) no-repeat #fff;
-	background-size: 100% 600px;
+	background: var(--paper);
 	overflow-wrap: break-word;
-	color: rgb(var(--gray-dark));
-	font-size: 20px;
-	line-height: 1.7;
+	color: var(--ink-2);
+	font-size: 18px;
+	line-height: 1.6;
 	-webkit-font-smoothing: antialiased;
 	text-rendering: optimizeLegibility;
+	font-feature-settings: "cv11", "ss01";
 }
+
+/* Subtle paper grain over the whole page. */
+body::before {
+	content: "";
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	z-index: -1;
+	opacity: 0.5;
+	background-image: radial-gradient(rgba(27, 26, 23, 0.035) 1px, transparent 1px);
+	background-size: 4px 4px;
+}
+
 main {
 	width: 720px;
 	max-width: calc(100% - 2em);
 	margin: auto;
 	padding: 3em 1em;
 }
+
 h1,
 h2,
 h3,
@@ -65,64 +118,106 @@ h4,
 h5,
 h6 {
 	margin: 0 0 0.5rem 0;
-	color: rgb(var(--black));
-	line-height: 1.2;
-	/* Balance multi-line headings and hyphenate instead of breaking
-	   words at arbitrary points when they're too wide for the screen. */
+	color: var(--ink);
+	font-family: var(--font-display);
+	font-weight: 600;
+	font-optical-sizing: auto;
+	line-height: 1.12;
 	text-wrap: balance;
 	hyphens: auto;
-	letter-spacing: -0.015em;
+	letter-spacing: -0.02em;
 }
-/* Fluid heading sizes: scale down smoothly on narrow screens so long
-   words fit without mid-word breaks. */
 h1 {
-	font-size: clamp(1.9rem, 4.5vw + 1rem, 3rem);
+	font-size: clamp(2.2rem, 5vw + 1rem, 3.6rem);
+	font-weight: 650;
+	letter-spacing: -0.03em;
 }
 h2 {
-	font-size: clamp(1.55rem, 3vw + 0.9rem, 2.3rem);
+	font-size: clamp(1.6rem, 2.6vw + 0.9rem, 2.3rem);
 }
 h3 {
-	font-size: clamp(1.3rem, 2vw + 0.85rem, 1.75rem);
+	font-size: clamp(1.3rem, 1.6vw + 0.9rem, 1.7rem);
 }
 h4 {
-	font-size: clamp(1.15rem, 1.2vw + 0.85rem, 1.4rem);
+	font-size: clamp(1.15rem, 1vw + 0.9rem, 1.35rem);
 }
 h5 {
-	font-size: 1.15rem;
+	font-size: 1.1rem;
 }
 strong,
 b {
-	font-weight: 700;
+	font-weight: 650;
 }
 a {
-	color: var(--accent);
-	text-decoration-color: rgba(35, 55, 255, 0.3);
+	color: var(--ink);
+	text-decoration-color: color-mix(in srgb, var(--brand) 55%, transparent);
+	text-decoration-thickness: 1.5px;
 	text-underline-offset: 3px;
-	transition: text-decoration-color 0.15s ease;
+	transition:
+		color 0.15s ease,
+		text-decoration-color 0.15s ease;
 }
 a:hover {
-	color: var(--accent-dark);
+	color: var(--brand-ink);
 	text-decoration-color: currentColor;
+}
+:focus-visible {
+	outline: 2px solid var(--brand);
+	outline-offset: 3px;
+	border-radius: 4px;
 }
 p {
 	margin-bottom: 1em;
 	text-wrap: pretty;
 }
-.prose p {
-	margin-bottom: 1.5em;
+
+/* ---------- Long-form prose ----------
+   Direct children only, so widget internals keep their own sans styling. */
+.prose {
+	color: var(--ink-2);
+}
+.prose > p,
+.prose > ul,
+.prose > ol,
+.prose > blockquote,
+.prose > table,
+.prose > details {
+	font-family: var(--font-serif);
+	font-size: 1.12em;
+	line-height: 1.68;
+}
+.prose > p {
+	margin-bottom: 1.35em;
+}
+.prose > h2 {
+	margin-top: 2.2em;
+	margin-bottom: 0.6em;
+}
+.prose > h3 {
+	margin-top: 1.8em;
+	margin-bottom: 0.5em;
+}
+.prose a {
+	color: var(--ink);
+}
+.prose a:hover {
+	color: var(--brand-ink);
 }
 .prose ul {
 	list-style: disc;
-	margin-bottom: 2em;
-	padding-left: 1.5em;
+	margin-bottom: 1.6em;
+	padding-left: 1.4em;
 }
 .prose ol {
 	list-style: decimal;
-	margin-bottom: 2em;
-	padding-left: 1.5em;
+	margin-bottom: 1.6em;
+	padding-left: 1.4em;
 }
 .prose li {
-	margin-bottom: 0.5em;
+	margin-bottom: 0.45em;
+}
+.prose li::marker {
+	color: var(--brand);
 }
 textarea {
 	width: 100%;
@@ -147,38 +242,132 @@ img {
 }
 code {
 	padding: 2px 5px;
-	background-color: rgb(var(--gray-light));
-	border-radius: 4px;
-	font-size: 0.875em;
+	background-color: var(--paper-2);
+	border: 1px solid var(--rule);
+	border-radius: 5px;
+	font-family: var(--font-mono);
+	font-size: 0.82em;
 }
 pre {
 	padding: 1.25em 1.5em;
-	border-radius: 8px;
+	border-radius: 10px;
 	overflow-x: auto;
 	font-size: 0.85em;
 }
 pre > code {
 	all: unset;
+	font-family: var(--font-mono);
 }
 blockquote {
-	border-left: 3px solid var(--accent);
-	padding: 0.25em 0 0.25em 1em;
+	border-left: 3px solid var(--brand);
+	padding: 0.1em 0 0.1em 1.1em;
 	margin: 0 0 1.5em 0;
-	font-size: 1.1em;
 	font-style: italic;
-	color: rgba(var(--gray-dark), 0.85);
+	color: var(--ink-2);
 }
 hr {
 	border: none;
-	border-top: 1px solid rgb(var(--gray-light));
+	border-top: 1px solid var(--rule);
 	margin: 2.5em 0;
 }
+
+/* ---------- Shared bits ---------- */
+.kicker {
+	font-family: var(--font-mono);
+	font-size: 0.72rem;
+	font-weight: 500;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+.pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35em;
+	font-family: var(--font-mono);
+	font-size: 0.66rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	padding: 0.28em 0.65em;
+	border-radius: 999px;
+	background: var(--paper-2);
+	color: var(--ink-2);
+	border: 1px solid var(--rule);
+	white-space: nowrap;
+}
+.pill.interactive {
+	background: var(--brand-wash);
+	border-color: color-mix(in srgb, var(--brand) 25%, transparent);
+	color: var(--brand-ink);
+}
+.pill.interactive::before {
+	content: "";
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--brand);
+}
+.pill.launch {
+	background: #e3efe0;
+	border-color: #c5dcbf;
+	color: #2e5a2a;
+}
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5em;
+	padding: 0.7em 1.25em;
+	border-radius: 999px;
+	font-family: var(--font-sans);
+	font-size: 0.92rem;
+	font-weight: 600;
+	text-decoration: none;
+	cursor: pointer;
+	border: 1.5px solid var(--ink);
+	transition:
+		transform 0.15s ease,
+		background 0.15s ease,
+		color 0.15s ease,
+		box-shadow 0.15s ease;
+}
+.btn-primary {
+	background: var(--ink);
+	color: var(--paper);
+}
+.btn-primary:hover {
+	background: var(--brand);
+	border-color: var(--brand);
+	color: #fff;
+	transform: translateY(-1px);
+	box-shadow: var(--shadow-md);
+}
+.btn-ghost {
+	background: transparent;
+	color: var(--ink);
+}
+.btn-ghost:hover {
+	background: var(--card);
+	color: var(--ink);
+	transform: translateY(-1px);
+	box-shadow: var(--shadow-sm);
+}
+
 @media (max-width: 720px) {
 	body {
-		font-size: 17.5px;
+		font-size: 17px;
 	}
 	main {
 		padding: 1.5em 1em;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		transition-duration: 0.01ms !important;
+		animation-duration: 0.01ms !important;
 	}
 }
 
@@ -190,12 +379,7 @@ hr {
 	height: 1px;
 	width: 1px;
 	overflow: hidden;
-	/* IE6, IE7 - a 0 height clip, off to the bottom right of the visible 1px box */
-	clip: rect(1px 1px 1px 1px);
-	/* maybe deprecated but we need to support legacy browsers */
 	clip: rect(1px, 1px, 1px, 1px);
-	/* modern browsers, clip-path works inwards from each corner */
 	clip-path: inset(50%);
-	/* added line to stop words getting smushed together (as they go onto separate lines and some screen readers do not understand line feeds as a space */
 	white-space: nowrap;
 }

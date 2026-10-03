@@ -1,72 +1,119 @@
 ---
 import { BUTTONDOWN_USERNAME } from '../consts';
+
+interface Props {
+	title?: string;
+	blurb?: string;
+}
+const {
+	title = 'Get the next one by email',
+	blurb = 'New posts and playable things, straight to your inbox. No spam, unsubscribe anytime.',
+} = Astro.props;
 ---
 
 <div class="subscribe">
-	<h3>Subscribe</h3>
-	<p>Get new posts delivered to your inbox.</p>
+	<div class="copy">
+		<h3>{title}</h3>
+		<p>{blurb}</p>
+	</div>
 	<form
 		action={`https://buttondown.com/api/emails/embed-subscribe/${BUTTONDOWN_USERNAME}`}
 		method="post"
 		target="popupwindow"
 	>
-		<div class="subscribe-form">
-			<input
-				type="email"
-				name="email"
-				placeholder="you@example.com"
-				required
-			/>
-			<button type="submit">Subscribe</button>
-		</div>
+		<label class="sr-only" for="subscribe-email">Email address</label>
+		<input id="subscribe-email" type="email" name="email" placeholder="you@example.com" autocomplete="email" required />
+		<button type="submit">Subscribe</button>
 	</form>
 </div>
 
 <style>
 	.subscribe {
-		max-width: 420px;
-		margin: 0 auto 1.5em;
-		text-align: center;
+		display: grid;
+		grid-template-columns: 1.1fr 1fr;
+		gap: 1.5rem 2.5rem;
+		align-items: center;
+		padding: 2rem 2.25rem;
+		border-radius: 20px;
+		background: var(--ink);
+		color: var(--paper);
+		position: relative;
+		overflow: hidden;
 	}
-	.subscribe h3 {
-		margin: 0 0 0.25em;
-		font-size: 1.1em;
-		color: rgb(var(--gray-dark));
+	.subscribe::after {
+		content: '';
+		position: absolute;
+		width: 170px;
+		height: 170px;
+		left: -60px;
+		bottom: -120px;
+		border-radius: 50%;
+		background: var(--brand);
+		opacity: 0.9;
+		pointer-events: none;
 	}
-	.subscribe p {
-		margin: 0 0 0.75em;
-		font-size: 0.9em;
-		color: rgb(var(--gray));
+	.copy,
+	form {
+		position: relative;
+		z-index: 1;
 	}
-	.subscribe-form {
+	h3 {
+		margin: 0 0 0.35rem;
+		color: var(--paper);
+		font-size: 1.5rem;
+	}
+	p {
+		margin: 0;
+		font-size: 0.95rem;
+		color: color-mix(in srgb, var(--paper) 72%, transparent);
+	}
+	form {
 		display: flex;
-		gap: 0.5em;
+		gap: 0.5rem;
+		padding: 0.35rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--paper) 10%, transparent);
+		border: 1px solid color-mix(in srgb, var(--paper) 18%, transparent);
 	}
-	.subscribe-form input {
+	input {
 		flex: 1;
-		padding: 0.5em 0.75em;
-		border: 1px solid rgb(var(--gray-light));
-		border-radius: 8px;
-		font-family: inherit;
-		font-size: 0.9em;
-	}
-	.subscribe-form input:focus {
-		outline: none;
-		border-color: var(--accent);
-	}
-	.subscribe-form button {
-		padding: 0.5em 1.25em;
-		background: var(--accent);
-		color: white;
+		min-width: 0;
+		padding: 0.6rem 0.9rem;
 		border: none;
-		border-radius: 8px;
+		border-radius: 999px;
+		background: transparent;
+		color: var(--paper);
 		font-family: inherit;
-		font-size: 0.9em;
-		font-weight: 600;
+		font-size: 16px;
+	}
+	input::placeholder {
+		color: color-mix(in srgb, var(--paper) 45%, transparent);
+	}
+	input:focus {
+		outline: none;
+	}
+	form:focus-within {
+		border-color: var(--brand);
+	}
+	button {
+		padding: 0.6rem 1.2rem;
+		background: var(--brand);
+		color: #fff;
+		border: none;
+		border-radius: 999px;
+		font-family: inherit;
+		font-size: 0.92rem;
+		font-weight: 650;
 		cursor: pointer;
 		transition: background 0.15s ease;
 	}
-	.subscribe-form button:hover {
-		background: var(--accent-dark);
+	button:hover {
+		background: var(--brand-ink);
+	}
+	@media (max-width: 720px) {
+		.subscribe {
+			grid-template-columns: 1fr;
+			padding: 1.6rem 1.4rem;
+		}
 	}
 </style>

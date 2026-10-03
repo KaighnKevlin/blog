@@ -1,116 +1,139 @@
 ---
-import { Image } from 'astro:assets';
-import { getCollection } from 'astro:content';
 import BaseHead from '../../components/BaseHead.astro';
 import Footer from '../../components/Footer.astro';
-import FormattedDate from '../../components/FormattedDate.astro';
 import Header from '../../components/Header.astro';
-import { SITE_DESCRIPTION, SITE_TITLE } from '../../consts';
+import PostCard from '../../components/PostCard.astro';
+import { SITE_TITLE } from '../../consts';
+import { KIND_LABEL, type PostKind, getPosts, postKind } from '../../lib/posts';
 
-const posts = (await getCollection('blog')).sort(
-	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+const posts = await getPosts();
+const counts = posts.reduce(
+	(acc, p) => ((acc[postKind(p)] += 1), acc),
+	{ interactive: 0, essay: 0, launch: 0 } as Record<PostKind, number>,
 );
+const filters = (Object.keys(counts) as PostKind[]).filter((k) => counts[k] > 0);
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
-		<style>
-			main {
-				width: 960px;
-			}
-			ul {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 2rem;
-				list-style-type: none;
-				margin: 0;
-				padding: 0;
-			}
-			ul li {
-				width: calc(50% - 1rem);
-			}
-			ul li * {
-				text-decoration: none;
-				transition: 0.2s ease;
-			}
-			ul li:first-child {
-				width: 100%;
-				margin-bottom: 1rem;
-				text-align: center;
-			}
-			ul li:first-child img {
-				width: 100%;
-			}
-			ul li:first-child .title {
-				font-size: 2.369rem;
-			}
-			ul li img {
-				margin-bottom: 0.5rem;
-				border-radius: 12px;
-			}
-			ul li a {
-				display: block;
-			}
-			.title {
-				margin: 0;
-				color: rgb(var(--black));
-				line-height: 1.25;
-			}
-			.date {
-				margin: 0.25em 0 0;
-				color: rgb(var(--gray));
-				font-size: 0.9em;
-			}
-			ul li a:hover .title,
-			ul li a:hover .date {
-				color: var(--accent);
-			}
-			ul a:hover img {
-				box-shadow: var(--box-shadow);
-			}
-			@media (max-width: 720px) {
-				ul {
-					gap: 1.75em;
-				}
-				ul li {
-					width: 100%;
-					text-align: left;
-				}
-				ul li:first-child {
-					margin-bottom: 0;
-					text-align: left;
-				}
-				ul li:first-child .title {
-					font-size: 1.563em;
-				}
-			}
-		</style>
+		<BaseHead
+			title={`Writing — ${SITE_TITLE}`}
+			description="Essays, interactive explainers, and the occasional launch announcement."
+		/>
 	</head>
 	<body>
 		<Header />
-		<main>
-			<section>
-				<ul>
-					{
-						posts.map((post) => (
-							<li>
-								<a href={`/blog/${post.id}/`}>
-									{post.data.heroImage && (
-										<Image width={720} height={360} src={post.data.heroImage} alt="" />
-									)}
-									<h4 class="title">{post.data.title}</h4>
-									<p class="date">
-										<FormattedDate date={post.data.pubDate} />
-									</p>
-								</a>
-							</li>
-						))
-					}
-				</ul>
-			</section>
+		<main class="writing">
+			<header class="intro">
+				<p class="kicker">The archive</p>
+				<h1>Writing</h1>
+				<p class="lede">
+					Essays, interactive explainers you can poke at, and the occasional launch. Anything marked
+					<span class="pill interactive">Interactive</span> has something to play with inside.
+				</p>
+			</header>
+
+			<div class="filters" role="group" aria-label="Filter posts">
+				<button type="button" class="chip" data-filter="all" aria-pressed="true">
+					All <span>{posts.length}</span>
+				</button>
+				{
+					filters.map((k) => (
+						<button type="button" class="chip" data-filter={k} aria-pressed="false">
+							{KIND_LABEL[k]} <span>{counts[k]}</span>
+						</button>
+					))
+				}
+			</div>
+
+			<div class="list">
+				{posts.map((post) => <PostCard post={post} variant="row" />)}
+			</div>
 		</main>
 		<Footer />
+
+		<script>
+			const chips = document.querySelectorAll<HTMLButtonElement>('.chip');
+			const rows = document.querySelectorAll<HTMLElement>('.list > a');
+			chips.forEach((chip) =>
+				chip.addEventListener('click', () => {
+					const f = chip.dataset.filter;
+					chips.forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+					rows.forEach((r) => (r.hidden = f !== 'all' && r.dataset.kind !== f));
+				}),
+			);
+		</script>
 	</body>
 </html>
+
+<style>
+	main.writing {
+		width: 880px;
+		padding-top: 3.5rem;
+	}
+	.intro {
+		margin-bottom: 2rem;
+	}
+	.intro .kicker {
+		margin: 0 0 0.6rem;
+	}
+	.intro h1 {
+		margin: 0 0 0.75rem;
+	}
+	.lede {
+		max-width: 36em;
+		margin: 0;
+		font-family: var(--font-serif);
+		font-size: 1.15rem;
+		color: var(--ink-2);
+	}
+	.lede .pill {
+		vertical-align: 0.15em;
+		font-family: var(--font-mono);
+	}
+	.filters {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		padding-bottom: 1rem;
+		border-bottom: 1px solid var(--rule);
+	}
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.45rem 0.95rem;
+		border-radius: 999px;
+		border: 1px solid var(--rule-strong);
+		background: var(--card);
+		font-family: var(--font-sans);
+		font-size: 0.88rem;
+		font-weight: 550;
+		color: var(--ink-2);
+		cursor: pointer;
+		transition:
+			background 0.15s ease,
+			color 0.15s ease,
+			border-color 0.15s ease;
+	}
+	.chip span {
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: var(--muted);
+	}
+	.chip:hover {
+		border-color: var(--ink);
+	}
+	.chip[aria-pressed='true'] {
+		background: var(--ink);
+		border-color: var(--ink);
+		color: var(--paper);
+	}
+	.chip[aria-pressed='true'] span {
+		color: color-mix(in srgb, var(--paper) 65%, transparent);
+	}
+	.list > :global(a[hidden]) {
+		display: none;
+	}
+</style>

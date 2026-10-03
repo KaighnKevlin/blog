@@ -1,0 +1,69 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import { SITE_TITLE } from '../consts';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`Not found — ${SITE_TITLE}`} description="This page doesn't exist." />
+		<meta name="robots" content="noindex" />
+	</head>
+	<body>
+		<Header />
+		<main class="nf">
+			<p class="code" aria-hidden="true">4<span>0</span>4</p>
+			<h1>This page is a proof by contradiction.</h1>
+			<p class="lede">
+				Suppose it existed. Then you'd be reading it. You aren't. So it doesn't. It may have moved,
+				or the link was wrong.
+			</p>
+			<div class="actions">
+				<a class="btn btn-primary" href="/">Go home</a>
+				<a class="btn btn-ghost" href="/blog">Browse writing</a>
+			</div>
+		</main>
+		<Footer subscribe={false} />
+	</body>
+</html>
+
+<style>
+	main.nf {
+		text-align: center;
+		padding-top: 5rem;
+	}
+	.code {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: clamp(6rem, 18vw, 11rem);
+		font-weight: 700;
+		line-height: 1;
+		letter-spacing: -0.06em;
+		color: var(--ink);
+		font-variation-settings: 'SOFT' 100, 'WONK' 1;
+	}
+	.code span {
+		color: var(--brand);
+		font-style: italic;
+	}
+	h1 {
+		margin: 1rem auto;
+		font-size: clamp(1.6rem, 3vw + 1rem, 2.4rem);
+		max-width: 16em;
+	}
+	.lede {
+		max-width: 30em;
+		margin: 0 auto 2rem;
+		font-family: var(--font-serif);
+		font-size: 1.15rem;
+		color: var(--muted);
+	}
+	.actions {
+		display: flex;
+		justify-content: center;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+</style>

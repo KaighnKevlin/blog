@@ -1,7 +1,8 @@
 ---
 import BaseHead from '../components/BaseHead.astro';
-import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import ProjectCard from '../components/ProjectCard.astro';
 import { SITE_TITLE } from '../consts';
 import projects from '../data/projects.json';
 ---
@@ -9,29 +10,62 @@ import projects from '../data/projects.json';
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead title={`Projects — ${SITE_TITLE}`} description="A showcase of my projects." />
+		<BaseHead title={`Projects — ${SITE_TITLE}`} description="Things I've built or am building." />
 	</head>
 	<body>
 		<Header />
-		<main>
-			<section>
-				<h1 class="text-4xl font-bold mb-2">Projects</h1>
-				<p class="text-gray-500 mb-8">Things I've built or am building.</p>
-				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-					{projects.map((project) => (
-						<a href={project.url} class="block rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow no-underline">
-							<h2 class="text-xl font-semibold mb-2 text-[rgb(var(--black))]">{project.title}</h2>
-							<p class="text-gray-600 mb-4">{project.description}</p>
-							<div class="flex flex-wrap gap-2">
-								{project.tags.map((tag) => (
-									<span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">{tag}</span>
-								))}
-							</div>
-						</a>
-					))}
-				</div>
-			</section>
+		<main class="projects-page">
+			<header class="intro">
+				<p class="kicker">The workshop</p>
+				<h1>Projects</h1>
+				<p class="lede">
+					Things I've built or am building: apps, simulations, games, and at least one bit that
+					went too far. The playable stuff that lives inside posts is over in
+					<a href="/blog">Writing</a>.
+				</p>
+			</header>
+			<div class="grid">
+				{projects.map((project) => <ProjectCard project={project} />)}
+			</div>
 		</main>
 		<Footer />
 	</body>
 </html>
+
+<style>
+	main.projects-page {
+		width: 1120px;
+		max-width: 100%;
+		padding: 3.5rem 1.25rem 1rem;
+	}
+	.intro {
+		max-width: 720px;
+		margin-bottom: 2.5rem;
+	}
+	.intro .kicker {
+		margin: 0 0 0.6rem;
+	}
+	.intro h1 {
+		margin: 0 0 0.75rem;
+	}
+	.lede {
+		margin: 0;
+		font-family: var(--font-serif);
+		font-size: 1.15rem;
+	}
+	.grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 1.5rem;
+	}
+	@media (max-width: 960px) {
+		.grid {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+	@media (max-width: 620px) {
+		.grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

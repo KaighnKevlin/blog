@@ -14,6 +14,8 @@ const blog = defineCollection({
 			pubDate: z.coerce.date(),
 			updatedDate: z.coerce.date().optional(),
 			heroImage: z.optional(image()),
+			// Optional override; otherwise derived in src/lib/posts.ts.
+			kind: z.enum(['interactive', 'essay', 'launch']).optional(),
 		}),
 });
 

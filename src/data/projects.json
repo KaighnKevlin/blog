@@ -1,52 +1,50 @@
 [
   {
-    "title": "Jeopardy",
-    "description": "A real-time multiplayer Jeopardy! game with authentic episodes from the J! Archive \u2014 buzzers, Daily Doubles, Final Jeopardy wagering, and live chat over WebSockets. Built with Django Channels.",
-    "url": "/jeopardy/",
-    "tags": [
-      "Multiplayer",
-      "WebSockets",
-      "Django"
-    ]
-  },
-  {
-    "title": "Kaighnbot",
-    "description": "An AI agent that automates tasks and integrates with external services. Built to explore the boundaries of autonomous AI tooling.",
-    "url": "#",
-    "tags": [
-      "AI",
-      "Agents",
-      "Automation"
-    ]
+    "title": "Call Roulette",
+    "description": "Spin a wheel, call a friend. A tiny installable web app that picks someone from your contacts so you actually keep in touch.",
+    "url": "/friends/",
+    "status": "live",
+    "cover": "call-roulette",
+    "tags": ["PWA", "Web"]
   },
   {
     "title": "Housing Simulator",
-    "description": "An interactive simulation modeling housing markets, zoning policies, and their downstream effects. Built for exploration and education.",
+    "description": "An interactive simulation modeling housing markets, zoning policies, and their downstream effects over 50 years of NYC.",
     "url": "/yimby/",
-    "tags": [
-      "Simulation",
-      "Interactive",
-      "Data Viz"
-    ]
+    "status": "live",
+    "cover": "yimby-nyc",
+    "tags": ["Simulation", "Rust + WASM", "Data Viz"]
   },
   {
-    "title": "Untitled Godot Game",
-    "description": "An indie game blending Terraria's exploration, Factorio's automation, and tower defense strategy. Work in progress in Godot 4.",
-    "url": "#",
-    "tags": [
-      "Godot",
-      "Game Dev",
-      "Indie"
-    ]
+    "title": "Kaighnbot",
+    "description": "Claude Code on a MacBook in the corner of my apartment, texting my friends, making plans, and running my calendar.",
+    "url": "/blog/kaighnbot/",
+    "status": "write-up",
+    "cover": "kaighnbot",
+    "tags": ["AI", "Agents"]
   },
   {
     "title": "OnlyKaighns",
     "description": "A parody of OnlyFans where the exclusive content is just a wall of photos of me. Subscribe to unlock everything (it's free, I just want your email).",
     "url": "/onlykaighns/",
-    "tags": [
-      "Parody",
-      "Web",
-      "Cursed"
-    ]
+    "status": "live",
+    "cover": "onlykaighns",
+    "tags": ["Parody", "Cursed"]
+  },
+  {
+    "title": "Jeopardy",
+    "description": "A real-time multiplayer Jeopardy! game with authentic episodes from the J! Archive: buzzers, Daily Doubles, Final Jeopardy wagering, and live chat over WebSockets.",
+    "url": null,
+    "status": "wip",
+    "cover": "jeopardy",
+    "tags": ["Multiplayer", "WebSockets", "Django"]
+  },
+  {
+    "title": "Untitled Godot Game",
+    "description": "An indie game blending Terraria's exploration, Factorio's automation, and tower defense strategy. Work in progress in Godot 4.",
+    "url": null,
+    "status": "wip",
+    "cover": "godot-game",
+    "tags": ["Godot", "Game Dev"]
   }
 ]
