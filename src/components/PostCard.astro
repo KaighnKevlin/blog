@@ -7,13 +7,15 @@ import PostCover from './PostCover.astro';
 interface Props {
 	post: Post;
 	variant?: 'card' | 'row' | 'feature';
+	/** Card that collapses to a compact thumbnail row on phones. */
+	mobileRow?: boolean;
 }
-const { post, variant = 'card' } = Astro.props;
+const { post, variant = 'card', mobileRow = false } = Astro.props;
 const kind = postKind(post);
 const href = `/blog/${post.id}/`;
 ---
 
-<a href={href} class:list={['post', variant]} data-kind={kind}>
+<a href={href} class:list={['post', variant, { 'mobile-row': mobileRow }]} data-kind={kind}>
 	<div class="art">
 		{
 			post.data.heroImage ? (
@@ -190,6 +192,28 @@ const href = `/blog/${post.id}/`;
 		}
 		.row .desc {
 			font-size: 0.95rem;
+		}
+	}
+	@media (max-width: 620px) {
+		.mobile-row {
+			display: grid;
+			grid-template-columns: 104px 1fr;
+			gap: 1rem;
+			align-items: center;
+			padding: 0.9rem 0;
+			border-bottom: 1px solid var(--rule);
+		}
+		.mobile-row .art {
+			border-radius: 10px;
+		}
+		.mobile-row .body {
+			padding: 0;
+		}
+		.mobile-row .meta {
+			margin-bottom: 0.3rem;
+		}
+		.mobile-row .title {
+			font-size: 1.08rem;
 		}
 	}
 </style>

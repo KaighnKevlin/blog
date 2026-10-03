@@ -80,7 +80,7 @@ const liveProjects = projects.filter((p) => p.url).slice(0, 3);
 					<a href="/blog" class="more">All {posts.length} posts <span aria-hidden="true">→</span></a>
 				</div>
 				<div class="grid">
-					{grid.map((post) => <PostCard post={post} />)}
+					{grid.map((post) => <PostCard post={post} mobileRow />)}
 				</div>
 			</section>
 
@@ -388,11 +388,37 @@ const liveProjects = projects.filter((p) => p.url).slice(0, 3);
 		.lede {
 			font-size: 1.08rem;
 		}
+		/* Buttons side by side, slightly smaller. */
+		.actions {
+			flex-wrap: nowrap;
+			gap: 0.5rem;
+		}
+		.actions .btn {
+			padding: 0.65rem 1rem;
+			font-size: 0.86rem;
+			white-space: nowrap;
+		}
+		/* Stats as an even three-column row: number over label. */
 		.stats {
-			gap: 0.4rem 1.4rem;
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+			gap: 1rem;
+			margin-top: 2rem;
+		}
+		.stats div {
+			flex-direction: column;
+			gap: 0.1rem;
 		}
 		.stats dt {
-			font-size: 1.4rem;
+			font-size: 1.6rem;
+			line-height: 1.1;
+		}
+		.stats dd {
+			font-size: 0.78rem;
+			line-height: 1.3;
+		}
+		.grid {
+			gap: 0;
 		}
 		/* The "Latest" card right below covers the same ground on phones. */
 		.fan {
