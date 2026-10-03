@@ -32,3 +32,6 @@ public/onlykaighns/*.jpeg
 public/onlykaighns/*.png
 public/onlykaighns/*.gif
 public/onlykaighns/*.heic
+
+# Claude Code local config
+.claude/
