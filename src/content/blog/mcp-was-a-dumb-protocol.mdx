@@ -16,7 +16,7 @@ Let me give you a dumb person's (me) take on the history of MCP.
 
 It all started in fall 2024, when Anthropic singlehandedly invented a way to make an LLM do something other than cure the male loneliness epidemic (cured!). Right around Thanksgiving dinner, someone showed me the blog post. I disappointed them with a reaction of "what the actual fuck is this shit?"
 
-Seriously, who the fuck thought of this shit? We're gonna run an actual server as an intermediary between your fuck-ass chatbot and my fuck-ass api? Just to give the chatbot some english about what my api can do? I run servers for a living… no thank you!
+Seriously, who thought of this? We're gonna run an actual server as an intermediary between your chatbot and my api? Just to give the chatbot some english about what my api can do? I run servers for a living… no thank you!
 
 But, I was just a hater. MCP took off. It captured the industry's heart and imagination. Did it ever produce something useful? I'm sure it has… just can't name it off the top of my head. But the vibes man. Those vibes go brrrr.
 
@@ -25,18 +25,18 @@ But, I was just a hater. MCP took off. It captured the industry's heart and imag
 So let's put down the haterade for a second. What problems was MCP trying to solve?
 
 - **"The N x M problem"** - everyone wanted their chatbot to talk to google drive, and slack, and a bunch of websites. Every chatbot dev had to reimplement an AI-friendly client for each website.
-- **"The OAuth problem"** - OAuth is that thing that pops up saying "do you give x site permission to fuck your shit up on this other y site?" It's a real pain in the ass from what I hear.
+- **"The OAuth problem"** - OAuth is that thing that pops up saying "do you give x site permission to mess with your stuff on this other y site?" It's a real pain from what I hear.
 
 
 Tbf, these are good problems to solve! And MCP was actually better than what people were doing at the time. But people tried to use MCP for *everything*. They heard MCP "server" and actually thought it was a good idea to host an MCP server. Fools!
 
-See, the thing is - everyone tried MCP locally. That shit was good. Your local agent loop could make calls to a local MCP process, and it was blazing fast, reliable, and extensible. The thing is, MCP capitalized on these local demos and dev workflows and then failed when it came to actually remotely wrapping remote APIs. Cursor switched out whatever the hell they were doing and started using MCP. And then OpenAI & Google announced support, and the rest is history.
+See, the thing is - everyone tried MCP locally. That was good. Your local agent loop could make calls to a local MCP process, and it was blazing fast, reliable, and extensible. The thing is, MCP capitalized on these local demos and dev workflows and then failed when it came to actually remotely wrapping remote APIs. Cursor switched out whatever the hell they were doing and started using MCP. And then OpenAI & Google announced support, and the rest is history.
 
 ## Then the backlash
 
-But now there's a backlash. All these engineers tried to make *remote* MCP work, and if you talk with any of them they'll say the hype was a bunch of horse shit. Why? There's a bunch of problems, but basically - *local* is a lot different than remote, and **stateful is BAD actually**.
+But now there's a backlash. All these engineers tried to make *remote* MCP work, and if you talk with any of them they'll say the hype was overblown. Why? There's a bunch of problems, but basically - *local* is a lot different than remote, and **stateful is BAD actually**.
 
-Everyone is gangster until they swap out the transport protocol from a local stateful connection to a remote handshake and open connection. My shitty ass 2017 Mac talking to itself? Turns out, a surprisingly reliable environment. Two cloud tasks maintaining a connection? Unsurprisingly, not great.
+Everyone is gangster until they swap out the transport protocol from a local stateful connection to a remote handshake and open connection. My crusty 2017 Mac talking to itself? Turns out, a surprisingly reliable environment. Two cloud tasks maintaining a connection? Unsurprisingly, not great.
 
 If you've ever done a system design interview, you know - stateful BAD, stateless GOOD. If you want something, fire off a request, and then get something back. This is REST. It works pretty darn good.
 
@@ -58,11 +58,11 @@ To illustrate, I spent months on this highly accurate simulation software, where
 
 ## Why was it stateful in the first place?
 
-So why was MCP stateful? I have no fucking clue. Who doesn't want a bidirectional stream between my many chatbots so I can settle up my dinner Splitwise? I dined alone, but still...
+So why was MCP stateful? I have no clue. Who doesn't want a bidirectional stream between my many chatbots so I can settle up my dinner Splitwise? I dined alone, but still...
 
 Little did we know. We just wanted to wrap APIs. Not relive *Snow Crash*.
 
-And to Anthropic's credit, they've realized this! No hate. They've apparently been hard at work removing tons of shit from MCP to make it make sense, e.g. [a stateless mode](https://blog.modelcontextprotocol.io/posts/2025-12-19-mcp-transport-future/).
+And to Anthropic's credit, they've realized this! No hate. They've apparently been hard at work removing tons of stuff from MCP to make it make sense, e.g. [a stateless mode](https://blog.modelcontextprotocol.io/posts/2025-12-19-mcp-transport-future/).
 
 ## The real MCP was inside us the whole time
 
